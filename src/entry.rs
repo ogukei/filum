@@ -5,6 +5,7 @@ use crate::error::Result;
 use std::ptr;
 use std::ffi::{CStr, CString};
 use std::mem::MaybeUninit;
+use libc::{c_float};
 
 #[derive(Debug)]
 struct Instance {
@@ -93,9 +94,44 @@ pub fn initialize() {
     for property in properties {
         println!("{:?}", property.device_name());
     }
-    let device = &devices[0];
-    let families = device.queue_family_properties();
-    println!("{:?}", families);
+
+    let device = DeviceBuilder::new()
+        .build(&devices)
+        .unwrap();
+    println!("{:?}", device.handle);
+}
+
+struct Device {
+    handle: VkDevice
+}
+
+struct DeviceBuilder {
+
+}
+
+impl DeviceBuilder {
+    pub fn new() -> DeviceBuilder { DeviceBuilder {} }
+
+    pub fn build(self, devices: &Vec<PhysicalDevice>) -> Result<Device> {
+        let device = &devices[0];
+        let families = device.queue_family_properties().unwrap();
+        // iterate through compute family candidates keeping the indices
+        let compute_families: Vec<_> = families.iter()
+            .enumerate()
+            .filter(|(_, family)| family.has_compute_queue_bit())
+            .collect();
+        let compute_family = compute_families.first().unwrap();
+        let priority: c_float = unsafe { std::mem::zeroed() };
+        let family_index = compute_family.0 as u32;
+        let queue_create_info = VkDeviceQueueCreateInfo::new(family_index, 1, &priority);
+        let device_create_info = VkDeviceCreateInfo::new(1, &queue_create_info);
+        unsafe {
+            let mut handle = MaybeUninit::<VkDevice>::uninit();
+            vkCreateDevice(device.handle, &device_create_info, std::ptr::null(), handle.as_mut_ptr())
+                .into_result()?;
+            Ok(Device { handle: handle.assume_init() })
+        }
+    }
 }
 
 impl VkPhysicalDeviceProperties {
