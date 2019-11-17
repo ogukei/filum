@@ -67,7 +67,7 @@ impl VkExtent3D {
 impl VkDeviceQueueCreateInfo {
     pub fn new(family_index: u32, queue_count: u32, queue_priorities: *const c_float) -> Self {
         VkDeviceQueueCreateInfo {
-            sType: VkStructureType::VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
+            sType: VkStructureType::VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
             pNext: ptr::null(),
             flags: 0,
             queueFamilyIndex: family_index,
