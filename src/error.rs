@@ -39,3 +39,13 @@ impl Error {
         }
     }
 }
+
+impl VkResult {
+    pub fn into_result(self) -> Result<()> {
+        if self == VkResult::VK_SUCCESS {
+            Ok(())
+        } else {
+            Err(Error::from(self))
+        }
+    }
+}
