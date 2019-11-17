@@ -1,6 +1,7 @@
 
 use crate::vk::*;
 use crate::error::Result;
+use crate::error::ErrorCode;
 
 use std::ptr;
 use std::ffi::{CStr, CString};
@@ -113,14 +114,16 @@ impl DeviceBuilder {
     pub fn new() -> DeviceBuilder { DeviceBuilder {} }
 
     pub fn build(self, devices: &Vec<PhysicalDevice>) -> Result<Device> {
-        let device = &devices[0];
-        let families = device.queue_family_properties().unwrap();
+        let device = devices.first()
+            .ok_or_else(|| ErrorCode::SuitablePhysicalDeviceNotFound)?;
+        let families = device.queue_family_properties()?;
         // iterate through compute family candidates keeping the indices
         let compute_families: Vec<_> = families.iter()
             .enumerate()
             .filter(|(_, family)| family.has_compute_queue_bit())
             .collect();
-        let compute_family = compute_families.first().unwrap();
+        let compute_family = compute_families.first()
+            .ok_or_else(|| ErrorCode::SuitablePhysicalDeviceNotFound)?;
         let priority: c_float = unsafe { std::mem::zeroed() };
         let family_index = compute_family.0 as u32;
         let queue_create_info = VkDeviceQueueCreateInfo::new(family_index, 1, &priority);
