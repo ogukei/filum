@@ -42,3 +42,20 @@ impl VkInstanceCreateInfo {
         }
     }
 }
+
+impl VkQueueFamilyProperties {
+    pub fn new() -> Self {
+        VkQueueFamilyProperties {
+            queueFlags: 0,
+            queueCount: 0,
+            timestampValidBits: 0,
+            minImageTransferGranularity: VkExtent3D::new()
+        }
+    }
+}
+
+impl VkExtent3D {
+    pub fn new() -> Self {
+        VkExtent3D { width: 0, height: 0, depth: 0 }
+    }
+}
