@@ -69,26 +69,26 @@ pub enum VkStructureType {
 // @see https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/VkApplicationInfo.html
 #[repr(C)]
 pub struct VkApplicationInfo {
-    pub s_type: VkStructureType,
-    pub p_next: *const c_void,
-    pub p_application_name: *const c_char,
-    pub application_version: u32,
-    pub engine_name: *const c_char,
-    pub engine_version: u32,
-    pub api_version: u32,
+    pub sType: VkStructureType,
+    pub pNext: *const c_void,
+    pub pApplicationName: *const c_char,
+    pub applicationVersion: u32,
+    pub pEngineName: *const c_char,
+    pub engineVersion: u32,
+    pub apiVersion: u32,
 }
 
 // @see https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/VkInstanceCreateInfo.html
 #[repr(C)]
 pub struct VkInstanceCreateInfo {
-    pub s_type: VkStructureType,
-    pub p_next: *const c_void,
+    pub sType: VkStructureType,
+    pub pNext: *const c_void,
     pub flags: VkFlags,
-    pub p_application_info: VkApplicationInfo,
-    pub enabled_layer_count: u32,
-    pub pp_enabled_layer_names: *const *const c_char,
-    pub enabled_extension_count: u32,
-    pub pp_enabled_extension_names: *const *const c_char,
+    pub pApplicationInfo: VkApplicationInfo,
+    pub enabledLayerCount: u32,
+    pub ppEnabledLayerNames: *const *const c_char,
+    pub enabledExtensionCount: u32,
+    pub ppEnabledExtensionNames: *const *const c_char,
 }
 
 // @see https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/VkAllocationCallbacks.html
@@ -246,9 +246,9 @@ pub struct VkPhysicalDeviceProperties {
 extern "C" {
     // @see https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/vkCreateInstance.html
     pub fn vkCreateInstance(
-        p_create_info: *const VkInstanceCreateInfo,
-        p_allocator: *const VkAllocationCallbacks,
-        p_instance: *mut VkInstance
+        pCreateInfo: *const VkInstanceCreateInfo,
+        pAllocator: *const VkAllocationCallbacks,
+        pInstance: *mut VkInstance
     ) -> VkResult;
     // @see https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/vkEnumeratePhysicalDevices.html
     pub fn vkEnumeratePhysicalDevices(

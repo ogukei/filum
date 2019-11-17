@@ -17,13 +17,13 @@ impl VkApplicationInfo {
         engine_version: u32) -> Self {
         
         VkApplicationInfo { 
-            s_type: VkStructureType::VK_STRUCTURE_TYPE_APPLICATION_INFO,
-            p_next: ptr::null(),
-            p_application_name: application_name,
-            application_version: application_version,
-            engine_name: engine_name,
-            engine_version: engine_version,
-            api_version: VK_API_VERSION_1_1,
+            sType: VkStructureType::VK_STRUCTURE_TYPE_APPLICATION_INFO,
+            pNext: ptr::null(),
+            pApplicationName: application_name,
+            applicationVersion: application_version,
+            pEngineName: engine_name,
+            engineVersion: engine_version,
+            apiVersion: VK_API_VERSION_1_1,
         }
     }
 }
@@ -31,14 +31,14 @@ impl VkApplicationInfo {
 impl VkInstanceCreateInfo {
     pub fn new(p_application_info: VkApplicationInfo) -> Self {
         VkInstanceCreateInfo { 
-            s_type: VkStructureType::VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
-            p_next: ptr::null(),
+            sType: VkStructureType::VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
+            pNext: ptr::null(),
             flags: 0,
-            p_application_info: p_application_info,
-            enabled_layer_count: 0,
-            pp_enabled_layer_names: ptr::null(),
-            enabled_extension_count: 0,
-            pp_enabled_extension_names: ptr::null(),
+            pApplicationInfo: p_application_info,
+            enabledLayerCount: 0,
+            ppEnabledLayerNames: ptr::null(),
+            enabledExtensionCount: 0,
+            ppEnabledExtensionNames: ptr::null(),
         }
     }
 }

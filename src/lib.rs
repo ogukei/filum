@@ -3,4 +3,6 @@ extern crate libc;
 
 mod error;
 mod vk;
-pub mod entry;
+mod entry;
+
+pub use entry::initialize;

@@ -1,7 +1,6 @@
 
 use crate::vk::*;
 use crate::error::Result;
-use crate::error::Error;
 
 use std::ptr;
 use std::ffi::{CStr, CString};
