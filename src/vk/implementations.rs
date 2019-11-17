@@ -4,7 +4,7 @@
 
 use crate::vk::*;
 
-use libc::{c_char};
+use libc::{c_char, c_float};
 use std::ptr;
 
 const VK_API_VERSION_1_1: u32 = 4198400;
@@ -39,6 +39,59 @@ impl VkInstanceCreateInfo {
             ppEnabledLayerNames: ptr::null(),
             enabledExtensionCount: 0,
             ppEnabledExtensionNames: ptr::null(),
+        }
+    }
+}
+
+impl VkQueueFamilyProperties {
+    pub fn new() -> Self {
+        VkQueueFamilyProperties {
+            queueFlags: 0,
+            queueCount: 0,
+            timestampValidBits: 0,
+            minImageTransferGranularity: VkExtent3D::new()
+        }
+    }
+
+    pub fn has_compute_queue_bit(&self) -> bool {
+        (self.queueFlags & (VkQueueFlagBits::VK_QUEUE_COMPUTE_BIT as u32)) != 0
+    }
+}
+
+impl VkExtent3D {
+    pub fn new() -> Self {
+        VkExtent3D { width: 0, height: 0, depth: 0 }
+    }
+}
+
+impl VkDeviceQueueCreateInfo {
+    pub fn new(family_index: u32, queue_count: u32, queue_priorities: *const c_float) -> Self {
+        VkDeviceQueueCreateInfo {
+            sType: VkStructureType::VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
+            pNext: ptr::null(),
+            flags: 0,
+            queueFamilyIndex: family_index,
+            queueCount: queue_count,
+            pQueuePriorities: queue_priorities,
+        }
+    }
+}
+
+impl VkDeviceCreateInfo {
+    pub fn new(
+        create_info_count: u32, 
+        create_queue_info: *const VkDeviceQueueCreateInfo) -> Self {
+        VkDeviceCreateInfo {
+            sType: VkStructureType::VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
+            pNext: ptr::null(),
+            flags: 0,
+            queueCreateInfoCount: create_info_count,
+            pQueueCreateInfos: create_queue_info,
+            enabledLayerCount: 0,
+            ppEnabledLayerNames: ptr::null(),
+            enabledExtensionCount: 0,
+            ppEnabledExtensionNames: ptr::null(),
+            pEnabledFeatures: ptr::null(),
         }
     }
 }

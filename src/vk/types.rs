@@ -7,6 +7,8 @@ use libc::{c_void, c_char, size_t, c_float};
 // @see https://www.khronos.org/registry/vulkan/specs/1.1/html/vkspec.html
 pub type VkFlags = u32;
 pub type VkSampleCountFlags = VkFlags;
+pub type VkQueueFlags = VkFlags;
+pub type VkDeviceCreateFlags = VkFlags;
 pub type VkBool32 = u32;
 
 #[repr(C)]
@@ -16,6 +18,10 @@ pub type VkInstance = *mut VkInstanceOpaque;
 #[repr(C)]
 pub struct VkPhysicalDeviceOpaque { _private: [u8; 0] }
 pub type VkPhysicalDevice = *mut VkPhysicalDeviceOpaque;
+
+#[repr(C)]
+pub struct VkDeviceOpaque { _private: [u8; 0] }
+pub type VkDevice = *mut VkDeviceOpaque;
 
 pub const VK_MAX_PHYSICAL_DEVICE_NAME_SIZE: size_t = 256;
 pub const VK_UUID_SIZE: size_t = 16;
@@ -59,11 +65,67 @@ pub enum VkResult {
     VK_RESULT_MAX_ENUM = 0x7FFFFFFF
 }
 
+// @see https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/VkExtent3D.html
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct VkExtent3D {
+    pub width: u32,
+    pub height: u32,
+    pub depth: u32,
+}
+
 // @see https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/VkStructureType.html
 #[repr(C)]
 pub enum VkStructureType {
     VK_STRUCTURE_TYPE_APPLICATION_INFO = 0,
     VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO = 1,
+    VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO = 2,
+    VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO = 3,
+    VK_STRUCTURE_TYPE_SUBMIT_INFO = 4,
+    VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO = 5,
+    VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE = 6,
+    VK_STRUCTURE_TYPE_BIND_SPARSE_INFO = 7,
+    VK_STRUCTURE_TYPE_FENCE_CREATE_INFO = 8,
+    VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO = 9,
+    VK_STRUCTURE_TYPE_EVENT_CREATE_INFO = 10,
+    VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO = 11,
+    VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO = 12,
+    VK_STRUCTURE_TYPE_BUFFER_VIEW_CREATE_INFO = 13,
+    VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO = 14,
+    VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO = 15,
+    VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO = 16,
+    VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO = 17,
+    VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO = 18,
+    VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO = 19,
+    VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO = 20,
+    VK_STRUCTURE_TYPE_PIPELINE_TESSELLATION_STATE_CREATE_INFO = 21,
+    VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO = 22,
+    VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO = 23,
+    VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO = 24,
+    VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO = 25,
+    VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO = 26,
+    VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO = 27,
+    VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO = 28,
+    VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO = 29,
+    VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO = 30,
+    VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO = 31,
+    VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO = 32,
+    VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO = 33,
+    VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO = 34,
+    VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET = 35,
+    VK_STRUCTURE_TYPE_COPY_DESCRIPTOR_SET = 36,
+    VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO = 37,
+    VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO = 38,
+    VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO = 39,
+    VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO = 40,
+    VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO = 41,
+    VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO = 42,
+    VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO = 43,
+    VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER = 44,
+    VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER = 45,
+    VK_STRUCTURE_TYPE_MEMORY_BARRIER = 46,
+    VK_STRUCTURE_TYPE_LOADER_INSTANCE_CREATE_INFO = 47,
+    VK_STRUCTURE_TYPE_LOADER_DEVICE_CREATE_INFO = 48,
 }
 
 // @see https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/VkApplicationInfo.html
@@ -242,6 +304,115 @@ pub struct VkPhysicalDeviceProperties {
     pub sparseProperties: VkPhysicalDeviceSparseProperties,
 }
 
+// @see https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/VkDeviceQueueCreateInfo.html
+#[repr(C)]
+pub struct VkDeviceQueueCreateInfo {
+    pub sType: VkStructureType,
+    pub pNext: *const c_void,
+    pub flags: VkFlags,
+    pub queueFamilyIndex: u32,
+    pub queueCount: u32,
+    pub pQueuePriorities: *const c_float,
+}
+
+// @see https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/VkQueueFlagBits.html
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub enum VkQueueFlagBits {
+    VK_QUEUE_GRAPHICS_BIT = 0x00000001,
+    VK_QUEUE_COMPUTE_BIT = 0x00000002,
+    VK_QUEUE_TRANSFER_BIT = 0x00000004,
+    VK_QUEUE_SPARSE_BINDING_BIT = 0x00000008,
+    VK_QUEUE_PROTECTED_BIT = 0x00000010,
+    VK_QUEUE_FLAG_BITS_MAX_ENUM = 0x7FFFFFFF,
+}
+
+// @see https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/VkQueueFamilyProperties.html
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct VkQueueFamilyProperties {
+    pub queueFlags: VkQueueFlags,
+    pub queueCount: u32,
+    pub timestampValidBits: u32,
+    pub minImageTransferGranularity: VkExtent3D,
+}
+
+// @see https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/VkPhysicalDeviceFeatures.html
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub struct VkPhysicalDeviceFeatures {
+    pub robustBufferAccess: VkBool32,
+    pub fullDrawIndexUint32: VkBool32,
+    pub imageCubeArray: VkBool32,
+    pub independentBlend: VkBool32,
+    pub geometryShader: VkBool32,
+    pub tessellationShader: VkBool32,
+    pub sampleRateShading: VkBool32,
+    pub dualSrcBlend: VkBool32,
+    pub logicOp: VkBool32,
+    pub multiDrawIndirect: VkBool32,
+    pub drawIndirectFirstInstance: VkBool32,
+    pub depthClamp: VkBool32,
+    pub depthBiasClamp: VkBool32,
+    pub fillModeNonSolid: VkBool32,
+    pub depthBounds: VkBool32,
+    pub wideLines: VkBool32,
+    pub largePoints: VkBool32,
+    pub alphaToOne: VkBool32,
+    pub multiViewport: VkBool32,
+    pub samplerAnisotropy: VkBool32,
+    pub textureCompressionETC2: VkBool32,
+    pub textureCompressionASTC_LDR: VkBool32,
+    pub textureCompressionBC: VkBool32,
+    pub occlusionQueryPrecise: VkBool32,
+    pub pipelineStatisticsQuery: VkBool32,
+    pub vertexPipelineStoresAndAtomics: VkBool32,
+    pub fragmentStoresAndAtomics: VkBool32,
+    pub shaderTessellationAndGeometryPointSize: VkBool32,
+    pub shaderImageGatherExtended: VkBool32,
+    pub shaderStorageImageExtendedFormats: VkBool32,
+    pub shaderStorageImageMultisample: VkBool32,
+    pub shaderStorageImageReadWithoutFormat: VkBool32,
+    pub shaderStorageImageWriteWithoutFormat: VkBool32,
+    pub shaderUniformBufferArrayDynamicIndexing: VkBool32,
+    pub shaderSampledImageArrayDynamicIndexing: VkBool32,
+    pub shaderStorageBufferArrayDynamicIndexing: VkBool32,
+    pub shaderStorageImageArrayDynamicIndexing: VkBool32,
+    pub shaderClipDistance: VkBool32,
+    pub shaderCullDistance: VkBool32,
+    pub shaderFloat64: VkBool32,
+    pub shaderInt64: VkBool32,
+    pub shaderInt16: VkBool32,
+    pub shaderResourceResidency: VkBool32,
+    pub shaderResourceMinLod: VkBool32,
+    pub sparseBinding: VkBool32,
+    pub sparseResidencyBuffer: VkBool32,
+    pub sparseResidencyImage2D: VkBool32,
+    pub sparseResidencyImage3D: VkBool32,
+    pub sparseResidency2Samples: VkBool32,
+    pub sparseResidency4Samples: VkBool32,
+    pub sparseResidency8Samples: VkBool32,
+    pub sparseResidency16Samples: VkBool32,
+    pub sparseResidencyAliased: VkBool32,
+    pub variableMultisampleRate: VkBool32,
+    pub inheritedQueries: VkBool32,
+}
+
+// @see https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/VkDeviceCreateInfo.html
+#[repr(C)]
+pub struct VkDeviceCreateInfo {
+    pub sType: VkStructureType,
+    pub pNext: *const c_void,
+    pub flags: VkDeviceCreateFlags,
+    pub queueCreateInfoCount: u32,
+    pub pQueueCreateInfos: *const VkDeviceQueueCreateInfo,
+    pub enabledLayerCount: u32,
+    pub ppEnabledLayerNames: *const *const c_char,
+    pub enabledExtensionCount: u32,
+    pub ppEnabledExtensionNames: *const *const c_char,
+    pub pEnabledFeatures: *const VkPhysicalDeviceFeatures,
+}
+
 #[link(name = "vulkan")]
 extern "C" {
     // @see https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/vkCreateInstance.html
@@ -261,4 +432,17 @@ extern "C" {
         physicalDevice: VkPhysicalDevice,
         pProperties: *mut VkPhysicalDeviceProperties,
     );
+    // @see https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/vkGetPhysicalDeviceQueueFamilyProperties.html
+    pub fn vkGetPhysicalDeviceQueueFamilyProperties(
+        physicalDevice: VkPhysicalDevice,
+        pQueueFamilyPropertyCount: *mut u32,
+        pQueueFamilyProperties: *mut VkQueueFamilyProperties,
+    );
+    // @see https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/vkCreateDevice.html
+    pub fn vkCreateDevice(
+        physicalDevice: VkPhysicalDevice,
+        pCreateInfo: *const VkDeviceCreateInfo,
+        pAllocator: *const VkAllocationCallbacks,
+        pDevice: *mut VkDevice,
+    ) -> VkResult;
 }
