@@ -1,5 +1,5 @@
 
-use stala::entry::initialize;
+use stala::initialize;
 
 fn main() {
     initialize();
