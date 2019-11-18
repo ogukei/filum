@@ -23,6 +23,10 @@ pub type VkPhysicalDevice = *mut VkPhysicalDeviceOpaque;
 pub struct VkDeviceOpaque { _private: [u8; 0] }
 pub type VkDevice = *mut VkDeviceOpaque;
 
+#[repr(C)]
+pub struct VkQueueOpaque { _private: [u8; 0] }
+pub type VkQueue = *mut VkQueueOpaque;
+
 pub const VK_MAX_PHYSICAL_DEVICE_NAME_SIZE: size_t = 256;
 pub const VK_UUID_SIZE: size_t = 16;
 
@@ -445,4 +449,11 @@ extern "C" {
         pAllocator: *const VkAllocationCallbacks,
         pDevice: *mut VkDevice,
     ) -> VkResult;
+    // @see https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/vkGetDeviceQueue.html
+    pub fn vkGetDeviceQueue(
+        device: VkDevice,
+        queueFamilyIndex: u32,
+        queueIndex: u32,
+        queue: *mut VkQueue,
+    );
 }

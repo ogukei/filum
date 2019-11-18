@@ -20,7 +20,7 @@ impl Instance {
         let app_info = VkApplicationInfo::new(application_name.as_ptr(), 0, engine_name.as_ptr(), 0);
         let instance_info = VkInstanceCreateInfo::new(app_info);
         unsafe {
-            let mut handle = MaybeUninit::<VkInstance>::uninit();
+            let mut handle = MaybeUninit::<VkInstance>::zeroed();
             vkCreateInstance(&instance_info, ptr::null(), handle.as_mut_ptr())
                 .into_result()?;
             let handle = handle.assume_init();
@@ -30,7 +30,7 @@ impl Instance {
 
     fn physical_devices(&self) -> Result<Vec<PhysicalDevice>> {
         unsafe {
-            let mut count = MaybeUninit::<u32>::uninit();
+            let mut count = MaybeUninit::<u32>::zeroed();
             // obtain count
             vkEnumeratePhysicalDevices(self.handle, count.as_mut_ptr(), ptr::null_mut())
                 .into_result()?;
@@ -60,7 +60,7 @@ impl PhysicalDevice {
 
     fn properties(&self) -> VkPhysicalDeviceProperties {
         unsafe {
-            let mut properties = MaybeUninit::<VkPhysicalDeviceProperties>::uninit();
+            let mut properties = MaybeUninit::<VkPhysicalDeviceProperties>::zeroed();
             vkGetPhysicalDeviceProperties(self.handle, properties.as_mut_ptr());
             properties.assume_init()
         }
@@ -68,7 +68,7 @@ impl PhysicalDevice {
 
     fn queue_family_properties(&self) -> Result<Vec<VkQueueFamilyProperties>> {
         unsafe {
-            let mut count = MaybeUninit::<u32>::uninit();
+            let mut count = MaybeUninit::<u32>::zeroed();
             // obtain count
             vkGetPhysicalDeviceQueueFamilyProperties(self.handle, count.as_mut_ptr(), ptr::null_mut());
             // obtain items
@@ -99,12 +99,14 @@ pub fn initialize() {
     let device = DeviceBuilder::new()
         .build(&devices)
         .unwrap();
-    println!("{:?}", device.handle);
+    println!("device: {:?}, queue: {:?}", device.handle, device.queue);
 }
 
 struct Device {
-    handle: VkDevice
+    handle: VkDevice,
+    queue: VkQueue,
 }
+
 
 struct DeviceBuilder {
 
@@ -129,10 +131,17 @@ impl DeviceBuilder {
         let queue_create_info = VkDeviceQueueCreateInfo::new(family_index, 1, &priority);
         let device_create_info = VkDeviceCreateInfo::new(1, &queue_create_info);
         unsafe {
-            let mut handle = MaybeUninit::<VkDevice>::uninit();
+            let mut handle = MaybeUninit::<VkDevice>::zeroed();
             vkCreateDevice(device.handle, &device_create_info, std::ptr::null(), handle.as_mut_ptr())
                 .into_result()?;
-            Ok(Device { handle: handle.assume_init() })
+            let handle = handle.assume_init();
+            // queues
+            let mut queue = MaybeUninit::<VkQueue>::zeroed();
+            vkGetDeviceQueue(handle, family_index, 0, queue.as_mut_ptr());
+            Ok(Device {
+                handle: handle,
+                queue: queue.assume_init(),
+            })
         }
     }
 }

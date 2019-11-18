@@ -79,14 +79,14 @@ impl VkDeviceQueueCreateInfo {
 
 impl VkDeviceCreateInfo {
     pub fn new(
-        create_info_count: u32, 
-        create_queue_info: *const VkDeviceQueueCreateInfo) -> Self {
+        create_queue_info_count: u32, 
+        create_queue_infos: *const VkDeviceQueueCreateInfo) -> Self {
         VkDeviceCreateInfo {
             sType: VkStructureType::VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
             pNext: ptr::null(),
             flags: 0,
-            queueCreateInfoCount: create_info_count,
-            pQueueCreateInfos: create_queue_info,
+            queueCreateInfoCount: create_queue_info_count,
+            pQueueCreateInfos: create_queue_infos,
             enabledLayerCount: 0,
             ppEnabledLayerNames: ptr::null(),
             enabledExtensionCount: 0,
