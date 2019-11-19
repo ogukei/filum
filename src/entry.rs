@@ -40,7 +40,7 @@ impl Instance {
             devices.resize(size, ptr::null_mut());
             vkEnumeratePhysicalDevices(self.handle, count.as_mut_ptr(), devices.as_mut_ptr())
                 .into_result()?;
-            let devices: Vec<_> = devices.into_iter()
+            let devices: Vec<PhysicalDevice> = devices.into_iter()
                 .map(|e| PhysicalDevice::new(e))
                 .collect();
             Ok(devices)
@@ -66,7 +66,7 @@ impl PhysicalDevice {
         }
     }
 
-    fn queue_family_properties(&self) -> Result<Vec<VkQueueFamilyProperties>> {
+    fn queue_families(&self) -> Result<Vec<QueueFamily>> {
         unsafe {
             let mut count = MaybeUninit::<u32>::zeroed();
             // obtain count
@@ -76,6 +76,10 @@ impl PhysicalDevice {
             let mut families: Vec<VkQueueFamilyProperties> = Vec::with_capacity(size);
             families.resize(size, std::mem::zeroed());
             vkGetPhysicalDeviceQueueFamilyProperties(self.handle, count.as_mut_ptr(), families.as_mut_ptr());
+            let families: Vec<QueueFamily> = families.into_iter()
+                .enumerate()
+                .map(|(i,v)| QueueFamily::new(i, v))
+                .collect();
             Ok(families)
         }
     }
@@ -99,14 +103,47 @@ pub fn initialize() {
     let device = DeviceBuilder::new()
         .build(&devices)
         .unwrap();
-    println!("device: {:?}, queue: {:?}", device.handle, device.queue);
+    println!("device: {:?}", device.handle);
 }
 
 struct Device {
     handle: VkDevice,
-    queue: VkQueue,
+    queue: Queue,
 }
 
+struct QueueFamily {
+    index: usize,
+    property: VkQueueFamilyProperties,
+}
+
+impl QueueFamily {
+    pub fn new(index: usize, property: VkQueueFamilyProperties) -> Self {
+        QueueFamily { index: index, property: property }
+    }
+
+    pub fn index(&self) -> usize {
+        self.index
+    }
+
+    pub fn queue_count(&self) -> u32 {
+        self.property.queueCount
+    }
+
+    pub fn is_compute(&self) -> bool {
+        self.property.has_compute_queue_bit()
+    }
+}
+
+struct Queue {
+    handle: VkQueue,
+    family: QueueFamily,
+}
+
+impl Queue {
+    pub fn new(handle: VkQueue, family: QueueFamily) -> Self {
+        Queue { handle: handle, family: family }
+    }
+}
 
 struct DeviceBuilder {
 
@@ -118,16 +155,17 @@ impl DeviceBuilder {
     pub fn build(self, devices: &Vec<PhysicalDevice>) -> Result<Device> {
         let device = devices.first()
             .ok_or_else(|| ErrorCode::SuitablePhysicalDeviceNotFound)?;
-        let families = device.queue_family_properties()?;
+        let families = device.queue_families()?;
         // iterate through compute family candidates keeping the indices
-        let compute_families: Vec<_> = families.iter()
-            .enumerate()
-            .filter(|(_, family)| family.has_compute_queue_bit())
+        let compute_families: Vec<_> = families.into_iter()
+            .filter(|family| family.is_compute())
             .collect();
-        let compute_family = compute_families.first()
+        // request single queue
+        let family = compute_families.into_iter()
+            .nth(0)
             .ok_or_else(|| ErrorCode::SuitablePhysicalDeviceNotFound)?;
-        let priority: c_float = unsafe { std::mem::zeroed() };
-        let family_index = compute_family.0 as u32;
+        let family_index = family.index() as u32;
+        let priority: c_float = 0.0;
         let queue_create_info = VkDeviceQueueCreateInfo::new(family_index, 1, &priority);
         let device_create_info = VkDeviceCreateInfo::new(1, &queue_create_info);
         unsafe {
@@ -140,7 +178,7 @@ impl DeviceBuilder {
             vkGetDeviceQueue(handle, family_index, 0, queue.as_mut_ptr());
             Ok(Device {
                 handle: handle,
-                queue: queue.assume_init(),
+                queue: Queue::new(queue.assume_init(), family),
             })
         }
     }
