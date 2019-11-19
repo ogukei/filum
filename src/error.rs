@@ -9,7 +9,8 @@ pub type Result<T> = result::Result<T, Error>;
 pub enum ErrorCode {
     VkResult(VkResult),
     FFI(std::ffi::NulError),
-    SuitablePhysicalDeviceNotFound
+    SuitablePhysicalDeviceNotFound,
+    SuitableBufferMemoryTypeNotFound
 }
 
 #[derive(Debug)]

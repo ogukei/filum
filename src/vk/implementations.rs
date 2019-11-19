@@ -111,3 +111,33 @@ impl VkCommandPoolCreateInfo {
         }
     }
 }
+
+impl VkBufferCreateInfo {
+    pub fn new(
+        size: VkDeviceSize,
+        usage_flags: VkBufferUsageFlags,
+        sharing_mode: VkSharingMode,
+    ) -> Self {
+        VkBufferCreateInfo {
+            sType: VkStructureType::VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+            pNext: ptr::null(),
+            flags: 0,
+            size: size,
+            usage: usage_flags,
+            sharingMode: sharing_mode,
+            queueFamilyIndexCount: 0,
+            pQueueFamilyIndices: ptr::null(),
+        }
+    }
+}
+
+impl VkMemoryAllocateInfo {
+    pub fn new(allocation_size: VkDeviceSize, memory_type_index: u32) -> Self {
+        VkMemoryAllocateInfo {
+            sType: VkStructureType::VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
+            pNext: ptr::null(),
+            allocationSize: allocation_size,
+            memoryTypeIndex: memory_type_index,
+        }
+    }
+}
