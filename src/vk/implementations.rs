@@ -65,7 +65,11 @@ impl VkExtent3D {
 }
 
 impl VkDeviceQueueCreateInfo {
-    pub fn new(family_index: u32, queue_count: u32, queue_priorities: *const c_float) -> Self {
+    pub fn new(
+        family_index: u32, 
+        queue_count: u32, 
+        queue_priorities: *const c_float) -> Self {
+
         VkDeviceQueueCreateInfo {
             sType: VkStructureType::VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
             pNext: ptr::null(),
@@ -79,19 +83,61 @@ impl VkDeviceQueueCreateInfo {
 
 impl VkDeviceCreateInfo {
     pub fn new(
-        create_info_count: u32, 
-        create_queue_info: *const VkDeviceQueueCreateInfo) -> Self {
+        create_queue_info_count: u32, 
+        create_queue_infos: *const VkDeviceQueueCreateInfo) -> Self {
+
         VkDeviceCreateInfo {
             sType: VkStructureType::VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
             pNext: ptr::null(),
             flags: 0,
-            queueCreateInfoCount: create_info_count,
-            pQueueCreateInfos: create_queue_info,
+            queueCreateInfoCount: create_queue_info_count,
+            pQueueCreateInfos: create_queue_infos,
             enabledLayerCount: 0,
             ppEnabledLayerNames: ptr::null(),
             enabledExtensionCount: 0,
             ppEnabledExtensionNames: ptr::null(),
             pEnabledFeatures: ptr::null(),
+        }
+    }
+}
+
+impl VkCommandPoolCreateInfo {
+    pub fn new(queue_family_index: u32) -> Self {
+        VkCommandPoolCreateInfo {
+            sType: VkStructureType::VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
+            pNext: ptr::null(),
+            flags: VkCommandPoolCreateFlagBits::VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT as u32,
+            queueFamilyIndex: queue_family_index,
+        }
+    }
+}
+
+impl VkBufferCreateInfo {
+    pub fn new(
+        size: VkDeviceSize,
+        usage_flags: VkBufferUsageFlags,
+        sharing_mode: VkSharingMode,
+    ) -> Self {
+        VkBufferCreateInfo {
+            sType: VkStructureType::VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+            pNext: ptr::null(),
+            flags: 0,
+            size: size,
+            usage: usage_flags,
+            sharingMode: sharing_mode,
+            queueFamilyIndexCount: 0,
+            pQueueFamilyIndices: ptr::null(),
+        }
+    }
+}
+
+impl VkMemoryAllocateInfo {
+    pub fn new(allocation_size: VkDeviceSize, memory_type_index: u32) -> Self {
+        VkMemoryAllocateInfo {
+            sType: VkStructureType::VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
+            pNext: ptr::null(),
+            allocationSize: allocation_size,
+            memoryTypeIndex: memory_type_index,
         }
     }
 }

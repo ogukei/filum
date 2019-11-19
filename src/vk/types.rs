@@ -5,26 +5,47 @@
 use libc::{c_void, c_char, size_t, c_float};
 
 // @see https://www.khronos.org/registry/vulkan/specs/1.1/html/vkspec.html
+
+pub type VkDeviceSize = u64;
+
+pub type VkBool32 = u32;
 pub type VkFlags = u32;
 pub type VkSampleCountFlags = VkFlags;
 pub type VkQueueFlags = VkFlags;
 pub type VkDeviceCreateFlags = VkFlags;
-pub type VkBool32 = u32;
+pub type VkCommandPoolCreateFlags = VkFlags;
+pub type VkBufferCreateFlags = VkFlags;
+pub type VkBufferUsageFlags = VkFlags;
+pub type VkMemoryPropertyFlags = VkFlags;
+pub type VkMemoryHeapFlags = VkFlags;
+pub type VkMemoryMapFlags = VkFlags;
 
 #[repr(C)]
 pub struct VkInstanceOpaque { _private: [u8; 0] }
 pub type VkInstance = *mut VkInstanceOpaque;
-
 #[repr(C)]
 pub struct VkPhysicalDeviceOpaque { _private: [u8; 0] }
 pub type VkPhysicalDevice = *mut VkPhysicalDeviceOpaque;
-
 #[repr(C)]
 pub struct VkDeviceOpaque { _private: [u8; 0] }
 pub type VkDevice = *mut VkDeviceOpaque;
+#[repr(C)]
+pub struct VkQueueOpaque { _private: [u8; 0] }
+pub type VkQueue = *mut VkQueueOpaque;
+#[repr(C)]
+pub struct VkCommandPoolOpaque { _private: [u8; 0] }
+pub type VkCommandPool = *mut VkCommandPoolOpaque;
+#[repr(C)]
+pub struct VkBufferOpaque { _private: [u8; 0] }
+pub type VkBuffer = *mut VkBufferOpaque;
+#[repr(C)]
+pub struct VkDeviceMemoryOpaque { _private: [u8; 0] }
+pub type VkDeviceMemory = *mut VkDeviceMemoryOpaque;
 
 pub const VK_MAX_PHYSICAL_DEVICE_NAME_SIZE: size_t = 256;
 pub const VK_UUID_SIZE: size_t = 16;
+pub const VK_MAX_MEMORY_TYPES: size_t = 32;
+pub const VK_MAX_MEMORY_HEAPS: size_t = 16;
 
 // @see https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/VkResult.html
 #[repr(C)]
@@ -72,6 +93,14 @@ pub struct VkExtent3D {
     pub width: u32,
     pub height: u32,
     pub depth: u32,
+}
+
+// @see https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/VkSharingMode.html
+#[repr(C)]
+pub enum VkSharingMode {
+    VK_SHARING_MODE_EXCLUSIVE = 0,
+    VK_SHARING_MODE_CONCURRENT = 1,
+    VK_SHARING_MODE_MAX_ENUM = 0x7FFFFFFF,
 }
 
 // @see https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/VkStructureType.html
@@ -166,8 +195,6 @@ pub enum VkPhysicalDeviceType {
     VK_PHYSICAL_DEVICE_TYPE_CPU = 4,
     VK_PHYSICAL_DEVICE_TYPE_MAX_ENUM = 0x7FFFFFFF,
 }
-
-type VkDeviceSize = u64;
 
 // @see https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/VkPhysicalDeviceLimits.html
 #[repr(C)]
@@ -327,6 +354,16 @@ pub enum VkQueueFlagBits {
     VK_QUEUE_FLAG_BITS_MAX_ENUM = 0x7FFFFFFF,
 }
 
+// @see https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/VkCommandPoolCreateFlagBits.html
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub enum VkCommandPoolCreateFlagBits {
+    VK_COMMAND_POOL_CREATE_TRANSIENT_BIT = 0x00000001,
+    VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT = 0x00000002,
+    VK_COMMAND_POOL_CREATE_PROTECTED_BIT = 0x00000004,
+    VK_COMMAND_POOL_CREATE_FLAG_BITS_MAX_ENUM = 0x7FFFFFFF
+}
+
 // @see https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/VkQueueFamilyProperties.html
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
@@ -413,6 +450,113 @@ pub struct VkDeviceCreateInfo {
     pub pEnabledFeatures: *const VkPhysicalDeviceFeatures,
 }
 
+// @see https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/VkCommandPoolCreateInfo.html
+#[repr(C)]
+pub struct VkCommandPoolCreateInfo {
+    pub sType: VkStructureType,
+    pub pNext: *const c_void,
+    pub flags: VkCommandPoolCreateFlags,
+    pub queueFamilyIndex: u32,
+}
+
+// @see https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/VkBufferCreateInfo.html
+#[repr(C)]
+pub struct VkBufferCreateInfo {
+    pub sType: VkStructureType,
+    pub pNext: *const c_void,
+    pub flags: VkBufferCreateFlags,
+    pub size: VkDeviceSize,
+    pub usage: VkBufferUsageFlags,
+    pub sharingMode: VkSharingMode,
+    pub queueFamilyIndexCount: u32,
+    pub pQueueFamilyIndices: *const u32,
+}
+
+// @see https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/VkMemoryPropertyFlagBits.html
+#[repr(C)]
+pub enum VkMemoryPropertyFlagBits {
+    VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT = 0x00000001,
+    VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT = 0x00000002,
+    VK_MEMORY_PROPERTY_HOST_COHERENT_BIT = 0x00000004,
+    VK_MEMORY_PROPERTY_HOST_CACHED_BIT = 0x00000008,
+    VK_MEMORY_PROPERTY_LAZILY_ALLOCATED_BIT = 0x00000010,
+    VK_MEMORY_PROPERTY_PROTECTED_BIT = 0x00000020,
+    VK_MEMORY_PROPERTY_DEVICE_COHERENT_BIT_AMD = 0x00000040,
+    VK_MEMORY_PROPERTY_DEVICE_UNCACHED_BIT_AMD = 0x00000080,
+    VK_MEMORY_PROPERTY_FLAG_BITS_MAX_ENUM = 0x7FFFFFFF,
+}
+
+// @see https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/VkMemoryHeapFlagBits.html
+#[repr(C)]
+pub enum VkMemoryHeapFlagBits {
+    VK_MEMORY_HEAP_DEVICE_LOCAL_BIT = 0x00000001,
+    VK_MEMORY_HEAP_MULTI_INSTANCE_BIT = 0x00000002,
+    VK_MEMORY_HEAP_FLAG_BITS_MAX_ENUM = 0x7FFFFFFF,
+}
+
+// @see https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/VkMemoryType.html
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub struct VkMemoryType {
+    pub propertyFlags: VkMemoryPropertyFlags,
+    pub heapIndex: u32,
+}
+
+// @see https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/VkMemoryHeap.html
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub struct VkMemoryHeap {
+    pub size: VkDeviceSize,
+    pub flags: VkMemoryHeapFlags,
+}
+
+// @see https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/VkPhysicalDeviceMemoryProperties.html
+#[repr(C)]
+pub struct VkPhysicalDeviceMemoryProperties {
+    pub memoryTypeCount: u32,
+    pub memoryTypes: [VkMemoryType; VK_MAX_MEMORY_TYPES],
+    pub memoryHeapCount: u32,
+    pub memoryHeaps: [VkMemoryHeap; VK_MAX_MEMORY_HEAPS],
+}
+
+// @see https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/VkMemoryRequirements.html
+#[repr(C)]
+#[derive(Debug)]
+pub struct VkMemoryRequirements {
+    pub size: VkDeviceSize,
+    pub alignment: VkDeviceSize,
+    pub memoryTypeBits: u32,
+}
+
+// @see https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/VkMemoryAllocateInfo.html
+#[repr(C)]
+pub struct VkMemoryAllocateInfo {
+    pub sType: VkStructureType,
+    pub pNext: *const c_void,
+    pub allocationSize: VkDeviceSize,
+    pub memoryTypeIndex: u32,
+}
+
+// @see https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/VkBufferUsageFlagBits.html
+#[repr(C)]
+pub enum VkBufferUsageFlagBits {
+    VK_BUFFER_USAGE_TRANSFER_SRC_BIT = 0x00000001,
+    VK_BUFFER_USAGE_TRANSFER_DST_BIT = 0x00000002,
+    VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT = 0x00000004,
+    VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT = 0x00000008,
+    VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT = 0x00000010,
+    VK_BUFFER_USAGE_STORAGE_BUFFER_BIT = 0x00000020,
+    VK_BUFFER_USAGE_INDEX_BUFFER_BIT = 0x00000040,
+    VK_BUFFER_USAGE_VERTEX_BUFFER_BIT = 0x00000080,
+    VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT = 0x00000100,
+    VK_BUFFER_USAGE_TRANSFORM_FEEDBACK_BUFFER_BIT_EXT = 0x00000800,
+    VK_BUFFER_USAGE_TRANSFORM_FEEDBACK_COUNTER_BUFFER_BIT_EXT = 0x00001000,
+    VK_BUFFER_USAGE_CONDITIONAL_RENDERING_BIT_EXT = 0x00000200,
+    VK_BUFFER_USAGE_RAY_TRACING_BIT_NV = 0x00000400,
+    VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT_EXT = 0x00020000,
+    VK_BUFFER_USAGE_FLAG_BITS_MAX_ENUM = 0x7FFFFFFF,
+}
+
 #[link(name = "vulkan")]
 extern "C" {
     // @see https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/vkCreateInstance.html
@@ -444,5 +588,65 @@ extern "C" {
         pCreateInfo: *const VkDeviceCreateInfo,
         pAllocator: *const VkAllocationCallbacks,
         pDevice: *mut VkDevice,
+    ) -> VkResult;
+    // @see https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/vkGetDeviceQueue.html
+    pub fn vkGetDeviceQueue(
+        device: VkDevice,
+        queueFamilyIndex: u32,
+        queueIndex: u32,
+        queue: *mut VkQueue,
+    );
+    // @see https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/vkCreateCommandPool.html
+    pub fn vkCreateCommandPool(
+        device: VkDevice,
+        pCreateInfo: *const VkCommandPoolCreateInfo,
+        pAllocator: *const VkAllocationCallbacks,
+        commandPool: *mut VkCommandPool,
+    ) -> VkResult;
+    // @see https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/vkCreateBuffer.html
+    pub fn vkCreateBuffer(
+        device: VkDevice,
+        pCreateInfo: *const VkBufferCreateInfo,
+        pAllocator: *const VkAllocationCallbacks,
+        pBuffer: *mut VkBuffer,
+    ) -> VkResult;
+    // @see https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/vkGetPhysicalDeviceMemoryProperties.html
+    pub fn vkGetPhysicalDeviceMemoryProperties(
+        physicalDevice: VkPhysicalDevice,
+        pMemoryProperties: *mut VkPhysicalDeviceMemoryProperties,
+    );
+    // @see https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/vkGetBufferMemoryRequirements.html
+    pub fn vkGetBufferMemoryRequirements(
+        device: VkDevice,
+        buffer: VkBuffer,
+        pMemoryRequirements: *mut VkMemoryRequirements,
+    );
+    // @see https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/vkAllocateMemory.html
+    pub fn vkAllocateMemory(
+        device: VkDevice,
+        pAllocateInfo: *const VkMemoryAllocateInfo,
+        pAllocator: *const VkAllocationCallbacks,
+        pMemory: *mut VkDeviceMemory,
+    ) -> VkResult;
+    // @see https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/vkMapMemory.html
+    pub fn vkMapMemory(
+        device: VkDevice,
+        memory: VkDeviceMemory,
+        offset: VkDeviceSize,
+        size: VkDeviceSize,
+        flags: VkMemoryMapFlags,
+        ppData: *mut *mut c_void,
+    ) -> VkResult;
+    // @see https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/vkUnmapMemory.html
+    pub fn vkUnmapMemory(
+        device: VkDevice,
+        memory: VkDeviceMemory,
+    );
+    // @see https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/vkBindBufferMemory.html
+    pub fn vkBindBufferMemory(
+        device: VkDevice,
+        buffer: VkBuffer,
+        memory: VkDeviceMemory,
+        memoryOffset: VkDeviceSize,
     ) -> VkResult;
 }

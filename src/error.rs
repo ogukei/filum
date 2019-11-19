@@ -8,7 +8,9 @@ pub type Result<T> = result::Result<T, Error>;
 #[derive(Debug)]
 pub enum ErrorCode {
     VkResult(VkResult),
-    FFI(std::ffi::NulError)
+    FFI(std::ffi::NulError),
+    SuitablePhysicalDeviceNotFound,
+    SuitableBufferMemoryTypeNotFound
 }
 
 #[derive(Debug)]
@@ -32,8 +34,8 @@ impl From<std::ffi::NulError> for Error {
     }
 }
 
-impl Error {
-    pub fn from_code(code: ErrorCode) -> Self {
+impl From<ErrorCode> for Error {
+    fn from(code: ErrorCode) -> Self {
         Error {
             u: Box::new(code)
         }
