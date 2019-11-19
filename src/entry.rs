@@ -103,12 +103,27 @@ pub fn initialize() {
     let device = DeviceBuilder::new()
         .build(&devices)
         .unwrap();
-    println!("device: {:?}", device.handle);
+
+    let command_pool = device.create_command_pool().unwrap();
+    println!("device: {:?}, command pool: {:?}", device.handle, command_pool);
+    
 }
 
 struct Device {
     handle: VkDevice,
     queue: Queue,
+}
+
+impl Device {
+    fn create_command_pool(&self) -> Result<VkCommandPool> {
+        unsafe {
+            let mut pool = MaybeUninit::<VkCommandPool>::zeroed();
+            let info = VkCommandPoolCreateInfo::new(self.queue.family.index() as u32);
+            vkCreateCommandPool(self.handle, &info, ptr::null(), pool.as_mut_ptr())
+                .into_result()?;
+            Ok(pool.assume_init())
+        }
+    }
 }
 
 struct QueueFamily {
@@ -150,7 +165,7 @@ struct DeviceBuilder {
 }
 
 impl DeviceBuilder {
-    pub fn new() -> DeviceBuilder { DeviceBuilder {} }
+    pub fn new() -> Self { DeviceBuilder {} }
 
     pub fn build(self, devices: &Vec<PhysicalDevice>) -> Result<Device> {
         let device = devices.first()

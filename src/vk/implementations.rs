@@ -65,7 +65,11 @@ impl VkExtent3D {
 }
 
 impl VkDeviceQueueCreateInfo {
-    pub fn new(family_index: u32, queue_count: u32, queue_priorities: *const c_float) -> Self {
+    pub fn new(
+        family_index: u32, 
+        queue_count: u32, 
+        queue_priorities: *const c_float) -> Self {
+
         VkDeviceQueueCreateInfo {
             sType: VkStructureType::VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
             pNext: ptr::null(),
@@ -81,6 +85,7 @@ impl VkDeviceCreateInfo {
     pub fn new(
         create_queue_info_count: u32, 
         create_queue_infos: *const VkDeviceQueueCreateInfo) -> Self {
+
         VkDeviceCreateInfo {
             sType: VkStructureType::VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
             pNext: ptr::null(),
@@ -92,6 +97,17 @@ impl VkDeviceCreateInfo {
             enabledExtensionCount: 0,
             ppEnabledExtensionNames: ptr::null(),
             pEnabledFeatures: ptr::null(),
+        }
+    }
+}
+
+impl VkCommandPoolCreateInfo {
+    pub fn new(queue_family_index: u32) -> Self {
+        VkCommandPoolCreateInfo {
+            sType: VkStructureType::VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
+            pNext: ptr::null(),
+            flags: VkCommandPoolCreateFlagBits::VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT as u32,
+            queueFamilyIndex: queue_family_index,
         }
     }
 }
