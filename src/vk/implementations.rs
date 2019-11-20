@@ -141,3 +141,74 @@ impl VkMemoryAllocateInfo {
         }
     }
 }
+
+impl VkMappedMemoryRange {
+    pub fn new(memory: VkDeviceMemory, offset: VkDeviceSize, size: VkDeviceSize) -> Self {
+        VkMappedMemoryRange {
+            sType: VkStructureType::VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE,
+            pNext: ptr::null(),
+            memory: memory,
+            offset: offset,
+            size: size,
+        }
+    }
+}
+
+impl VkCommandBufferAllocateInfo {
+    pub fn new(command_pool: VkCommandPool, level: VkCommandBufferLevel, command_buffer_count: u32) -> Self {
+        VkCommandBufferAllocateInfo {
+            sType: VkStructureType::VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+            pNext: ptr::null(),
+            commandPool: command_pool,
+            level: level,
+            commandBufferCount: command_buffer_count,
+        }
+    }
+}
+
+impl VkCommandBufferBeginInfo {
+    pub fn new() -> Self {
+        VkCommandBufferBeginInfo {
+            sType: VkStructureType::VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+            pNext: ptr::null(),
+            flags: 0,
+            pInheritanceInfo: ptr::null(),
+        }
+    }
+}
+
+impl VkBufferCopy {
+    pub fn new(size: VkDeviceSize) -> Self {
+        VkBufferCopy {
+            srcOffset: 0,
+            dstOffset: 0,
+            size: size,
+        }
+    }
+}
+
+impl VkSubmitInfo {
+    pub fn with_command_buffer(count: u32, buffers: *const VkCommandBuffer) -> Self {
+        VkSubmitInfo {
+            sType: VkStructureType::VK_STRUCTURE_TYPE_SUBMIT_INFO,
+            pNext: ptr::null(),
+            waitSemaphoreCount: 0,
+            pWaitSemaphores: ptr::null(),
+            pWaitDstStageMask: ptr::null(),
+            commandBufferCount: count,
+            pCommandBuffers: buffers,
+            signalSemaphoreCount: 0,
+            pSignalSemaphores: ptr::null(),
+        }
+    }
+}
+
+impl VkFenceCreateInfo {
+    pub fn new(flags: VkFenceCreateFlags) -> Self {
+        VkFenceCreateInfo {
+            sType: VkStructureType::VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
+            pNext: ptr::null(),
+            flags: flags,
+        }
+    }
+}

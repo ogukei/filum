@@ -105,24 +105,76 @@ pub fn initialize() {
         .build(&devices)
         .unwrap();
 
-    let command_pool = device.create_command_pool().unwrap();
-    println!("device: {:?}, command pool: {:?}", device.handle, command_pool);
-    let transfer_src = VkBufferUsageFlagBits::VK_BUFFER_USAGE_TRANSFER_SRC_BIT as u32;
-    let transfer_dst = VkBufferUsageFlagBits::VK_BUFFER_USAGE_TRANSFER_DST_BIT as u32;
-    let host_visible = VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT as u32;
-    const BUFFER_ELEMENTS: usize = 32;
-    let buffer_size = (BUFFER_ELEMENTS * mem::size_of::<u32>()) as VkDeviceSize;
+    unsafe {
+        let command_pool = device.create_command_pool().unwrap();
+        println!("device: {:?}, command pool: {:?}", device.handle, command_pool);
+        const BUFFER_ELEMENTS: usize = 32;
+        let buffer_size = (BUFFER_ELEMENTS * mem::size_of::<u32>()) as VkDeviceSize;
+    
+        let mut input: Vec<u32> = Vec::with_capacity(BUFFER_ELEMENTS);
+        let mut output: Vec<u32> = Vec::with_capacity(BUFFER_ELEMENTS);
+        input.resize(BUFFER_ELEMENTS, 0);
+        output.resize(BUFFER_ELEMENTS, 0);
+        // host buffer
+        let (host_buffer, host_memory) = device.create_buffer(
+            VkBufferUsageFlagBits::VK_BUFFER_USAGE_TRANSFER_SRC_BIT as u32 | 
+                VkBufferUsageFlagBits::VK_BUFFER_USAGE_TRANSFER_DST_BIT as u32, 
+            VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT as u32,
+            buffer_size,
+            input.as_mut_ptr() as *mut c_void).unwrap();
+        println!("buffer: {:?}", host_buffer);
+        // Flush writes to host visible buffer
+        let mut mapped = MaybeUninit::<*mut c_void>::zeroed();
+        vkMapMemory(device.handle, host_memory, 0, VK_WHOLE_SIZE, 0, mapped.as_mut_ptr())
+            .into_result()
+            .unwrap();
+        let mapped_memory_range = VkMappedMemoryRange::new(host_memory, 0, VK_WHOLE_SIZE);
+        vkFlushMappedMemoryRanges(device.handle, 1, &mapped_memory_range)
+            .into_result()
+            .unwrap();
+        vkUnmapMemory(device.handle, host_memory);
+        // device buffer
+        let (device_buffer, device_memory) = device.create_buffer(
+            VkBufferUsageFlagBits::VK_BUFFER_USAGE_TRANSFER_SRC_BIT as u32 | 
+                VkBufferUsageFlagBits::VK_BUFFER_USAGE_TRANSFER_DST_BIT as u32 |
+                VkBufferUsageFlagBits::VK_BUFFER_USAGE_STORAGE_BUFFER_BIT as u32,
+            VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT as u32,
+            buffer_size,
+            ptr::null_mut()).unwrap();
+        // Copy to staging buffer
+        let allocate_info = VkCommandBufferAllocateInfo::new(command_pool, VkCommandBufferLevel::VK_COMMAND_BUFFER_LEVEL_PRIMARY, 1);
+        let mut copy_command = MaybeUninit::<VkCommandBuffer>::zeroed();
+        vkAllocateCommandBuffers(device.handle, &allocate_info, copy_command.as_mut_ptr())
+            .into_result()
+            .unwrap();
+        let copy_command = copy_command.assume_init();
+        let begin_info = VkCommandBufferBeginInfo::new();
+        vkBeginCommandBuffer(copy_command, &begin_info)
+            .into_result()
+            .unwrap();
+        let copy_region = VkBufferCopy::new(buffer_size);
+        vkCmdCopyBuffer(copy_command, host_buffer, device_buffer, 1, &copy_region);
+        vkEndCommandBuffer(copy_command)
+            .into_result()
+            .unwrap();
+        let submit_info = VkSubmitInfo::with_command_buffer(1, &copy_command);
+        let fence_info = VkFenceCreateInfo::new(VK_FLAGS_NONE);
+        let mut fence = MaybeUninit::<VkFence>::zeroed();
+        vkCreateFence(device.handle, &fence_info, ptr::null(), fence.as_mut_ptr())
+            .into_result()
+            .unwrap();
+        let fence = fence.assume_init();
+        // submit to the queue
+        vkQueueSubmit(device.queue.handle, 1, &submit_info, fence)
+            .into_result()
+            .unwrap();
+        vkWaitForFences(device.handle, 1, &fence, VK_TRUE, u64::max_value())
+            .into_result()
+            .unwrap();
+        vkDestroyFence(device.handle, fence, ptr::null());
+        vkFreeCommandBuffers(device.handle, command_pool, 1, &copy_command);
+    }
 
-    let mut input: Vec<u32> = Vec::with_capacity(BUFFER_ELEMENTS);
-    let mut output: Vec<u32> = Vec::with_capacity(BUFFER_ELEMENTS);
-    input.resize(BUFFER_ELEMENTS, 0);
-    output.resize(BUFFER_ELEMENTS, 0);
-    let (host_buffer) = device.create_buffer(
-        transfer_src | transfer_dst, 
-        host_visible,
-        buffer_size,
-        input.as_mut_ptr() as *mut c_void).unwrap();
-    println!("buffer: {:?}", host_buffer);
 }
 
 struct Device {
@@ -147,7 +199,7 @@ impl Device {
         usage: VkBufferUsageFlags, 
         memory_property_flags: VkMemoryPropertyFlags, 
         size: VkDeviceSize,
-        data: *mut c_void) -> Result<(VkBuffer)> {
+        data: *mut c_void) -> Result<(VkBuffer, VkDeviceMemory)> {
         unsafe {
             // creates buffer
             let mut buffer = MaybeUninit::<VkBuffer>::zeroed();
@@ -195,7 +247,7 @@ impl Device {
             vkBindBufferMemory(self.handle, buffer, memory, 0)
                 .into_result()
                 .unwrap();
-            Ok(buffer)
+            Ok((buffer, memory))
         }
     }
 }
