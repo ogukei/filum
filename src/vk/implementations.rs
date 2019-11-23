@@ -201,6 +201,23 @@ impl VkSubmitInfo {
             pSignalSemaphores: ptr::null(),
         }
     }
+
+    pub fn with_command_buffer_wait(
+        count: u32,
+        buffers: *const VkCommandBuffer,
+        waitDstStageMask: *const VkPipelineStageFlags) -> Self {
+        VkSubmitInfo {
+            sType: VkStructureType::VK_STRUCTURE_TYPE_SUBMIT_INFO,
+            pNext: ptr::null(),
+            waitSemaphoreCount: 0,
+            pWaitSemaphores: ptr::null(),
+            pWaitDstStageMask: waitDstStageMask,
+            commandBufferCount: count,
+            pCommandBuffers: buffers,
+            signalSemaphoreCount: 0,
+            pSignalSemaphores: ptr::null(),
+        }
+    }
 }
 
 impl VkFenceCreateInfo {
@@ -399,6 +416,27 @@ impl VkSpecializationInfo {
             pMapEntries: entries,
             dataSize: data_size,
             pData: data,
+        }
+    }
+}
+
+impl VkBufferMemoryBarrier {
+    pub fn new(
+        src_access_mask: VkAccessFlags, 
+        dst_access_mask: VkAccessFlags,
+        buffer: VkBuffer,
+        size: VkDeviceSize,
+    ) -> Self {
+        VkBufferMemoryBarrier {
+            sType: VkStructureType::VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
+            pNext: ptr::null(),
+            srcAccessMask: src_access_mask,
+            dstAccessMask: dst_access_mask,
+            srcQueueFamilyIndex: VK_QUEUE_FAMILY_IGNORED,
+            dstQueueFamilyIndex: VK_QUEUE_FAMILY_IGNORED,
+            buffer: buffer,
+            offset: 0,
+            size: size,
         }
     }
 }
