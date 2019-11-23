@@ -212,3 +212,157 @@ impl VkFenceCreateInfo {
         }
     }
 }
+
+impl VkDescriptorPoolSize {
+    pub fn new(descriptor_type: VkDescriptorType, count: u32) -> VkDescriptorPoolSize {
+        VkDescriptorPoolSize {
+            descriptorType: descriptor_type,
+            descriptorCount: count,
+        }
+    }
+}
+
+impl VkDescriptorPoolCreateInfo {
+    pub fn new(max_sets: u32, count: u32, sizes: *const VkDescriptorPoolSize) -> Self {
+        VkDescriptorPoolCreateInfo {
+            sType: VkStructureType::VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
+            pNext: ptr::null(),
+            flags: 0,
+            maxSets: max_sets,
+            poolSizeCount: count,
+            pPoolSizes: sizes,
+        }
+    }
+}
+
+impl VkDescriptorSetLayoutBinding {
+    pub fn new(
+        descriptor_type: VkDescriptorType, 
+        stage_flags: u32,
+        binding: u32) -> Self {
+        VkDescriptorSetLayoutBinding {
+            binding: binding,
+            descriptorType: descriptor_type,
+            descriptorCount: 1,
+            stageFlags: stage_flags,
+            pImmutableSamplers: ptr::null(),
+        }
+    }
+}
+
+impl VkDescriptorSetLayoutCreateInfo {
+    pub fn new(count: u32, bindings: *const VkDescriptorSetLayoutBinding) -> Self {
+        VkDescriptorSetLayoutCreateInfo {
+            sType: VkStructureType::VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+            pNext: ptr::null(),
+            flags: 0,
+            bindingCount: count,
+            pBindings: bindings,
+        }
+    }
+}
+
+impl VkPipelineLayoutCreateInfo {
+    pub fn new(count: u32, layouts: *const VkDescriptorSetLayout) -> Self {
+        VkPipelineLayoutCreateInfo {
+            sType: VkStructureType::VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
+            pNext: ptr::null(),
+            flags: 0,
+            setLayoutCount: count,
+            pSetLayouts: layouts,
+            pushConstantRangeCount: 0,
+            pPushConstantRanges: ptr::null(),
+        }
+    }
+}
+
+impl VkDescriptorSetAllocateInfo {
+    pub fn new(descriptor_pool: VkDescriptorPool, set_count: u32, layouts: *const VkDescriptorSetLayout) -> Self {
+        VkDescriptorSetAllocateInfo {
+            sType: VkStructureType::VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
+            pNext: ptr::null(),
+            descriptorPool: descriptor_pool,
+            descriptorSetCount: set_count,
+            pSetLayouts: layouts,
+        }
+    }
+}
+
+impl VkDescriptorBufferInfo {
+    pub fn new(buffer: VkBuffer, offset: VkDeviceSize, range: VkDeviceSize) -> Self {
+        VkDescriptorBufferInfo {
+            buffer: buffer,
+            offset: offset,
+            range: range,
+        }
+    }
+}
+
+impl VkWriteDescriptorSet {
+    pub fn new(
+        dst_set: VkDescriptorSet, 
+        descriptor_type: VkDescriptorType,
+        dst_binding: u32,
+        buffer_info: *const VkDescriptorBufferInfo,
+    ) -> Self {
+        VkWriteDescriptorSet {
+            sType: VkStructureType::VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+            pNext: ptr::null(),
+            dstSet: dst_set,
+            dstBinding: dst_binding,
+            dstArrayElement: 0,
+            descriptorCount: 1,
+            descriptorType: descriptor_type,
+            pImageInfo: ptr::null(),
+            pBufferInfo: buffer_info,
+            pTexelBufferView: ptr::null(),
+        }
+    }
+}
+
+impl VkPipelineCacheCreateInfo {
+    pub fn new() -> Self {
+        VkPipelineCacheCreateInfo {
+            sType: VkStructureType::VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO,
+            pNext: ptr::null(),
+            flags: 0,
+            initialDataSize: 0,
+            pInitialData: ptr::null(),
+        }
+    }
+}
+
+impl VkPipelineShaderStageCreateInfo {
+    pub fn new(
+        stage: VkShaderStageFlagBits, 
+        module: VkShaderModule,
+        name: *const c_char,
+        specialization_info: *const VkSpecializationInfo) -> Self {
+        VkPipelineShaderStageCreateInfo {
+            sType: VkStructureType::VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+            pNext: ptr::null(),
+            flags: 0,
+            stage: stage,
+            module: module,
+            pName: name,
+            pSpecializationInfo: specialization_info,
+        }
+    }
+}
+
+impl VkComputePipelineCreateInfo {
+    pub fn new(
+        flags: VkPipelineCreateFlags,
+        stage: VkPipelineShaderStageCreateInfo,
+        layout: VkPipelineLayout) -> Self {
+        VkComputePipelineCreateInfo {
+            sType: VkStructureType::VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
+            pNext: ptr::null(),
+            flags: flags,
+            stage: stage,
+            layout: layout,
+            basePipelineHandle: ptr::null_mut(),
+            basePipelineIndex: 0,
+        }
+    }
+}
