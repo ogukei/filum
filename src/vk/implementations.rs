@@ -4,7 +4,7 @@
 
 use crate::vk::*;
 
-use libc::{c_char, c_float};
+use libc::{c_char, c_float, size_t};
 use std::ptr;
 
 const VK_API_VERSION_1_1: u32 = 4198400;
@@ -363,6 +363,18 @@ impl VkComputePipelineCreateInfo {
             layout: layout,
             basePipelineHandle: ptr::null_mut(),
             basePipelineIndex: 0,
+        }
+    }
+}
+
+impl VkShaderModuleCreateInfo {
+    pub fn new(code_size_bytes: size_t, code: *const u32) -> Self {
+        VkShaderModuleCreateInfo {
+            sType: VkStructureType::VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
+            pNext: ptr::null(),
+            flags: 0,
+            codeSize: code_size_bytes,
+            pCode: code,
         }
     }
 }

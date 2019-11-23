@@ -31,6 +31,7 @@ pub type VkPipelineLayoutCreateFlags = VkFlags;
 pub type VkPipelineCacheCreateFlags = VkFlags;
 pub type VkPipelineCreateFlags = VkFlags;
 pub type VkPipelineShaderStageCreateFlags = VkFlags;
+pub type VkShaderModuleCreateFlags = VkFlags;
 
 #[repr(C)]
 pub struct VkInstanceOpaque { _private: [u8; 0] }
@@ -950,6 +951,16 @@ pub struct VkSpecializationMapEntry {
     pub size: size_t,
 }
 
+// @see https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/VkShaderModuleCreateInfo.html
+#[repr(C)]
+pub struct VkShaderModuleCreateInfo {
+    pub sType: VkStructureType,
+    pub pNext: *const c_void,
+    pub flags: VkShaderModuleCreateFlags,
+    pub codeSize: size_t,
+    pub pCode: *const u32,
+}
+
 #[link(name = "vulkan")]
 extern "C" {
     // @see https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/vkCreateInstance.html
@@ -1157,5 +1168,11 @@ extern "C" {
         pAllocator: *const VkAllocationCallbacks,
         pPipelines: *mut VkPipeline,
     ) -> VkResult;
-    
+    // @see https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/vkCreateShaderModule.html
+    pub fn vkCreateShaderModule(
+        device: VkDevice,
+        pCreateInfo: *const VkShaderModuleCreateInfo,
+        pAllocator: *const VkAllocationCallbacks,
+        pShaderModule: *mut VkShaderModule,
+    ) -> VkResult;
 }

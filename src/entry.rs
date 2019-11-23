@@ -9,6 +9,8 @@ use std::ffi::{CStr, CString};
 use std::mem::MaybeUninit;
 use libc::{c_float, c_void};
 
+use std::io::Read;
+
 #[derive(Debug)]
 struct Instance {
     handle: VkInstance,
@@ -111,7 +113,7 @@ pub fn initialize() {
 }
 
 struct ComputePipeline {
-
+    shader_module: ShaderModule,
 }
 
 impl ComputePipeline {
@@ -169,12 +171,17 @@ impl ComputePipeline {
                     .unwrap();
             }
             let pipeline_cache = pipeline_cache.assume_init();
-
-            ComputePipeline {}
+            let shader_module = ShaderModule::new(device)
+                .unwrap();
+            {
+                
+            }
+            ComputePipeline {
+                shader_module: shader_module,
+            }
         }
     }
 }
-
 
 struct StagingBuffer {
     buffer_element_count: usize,
@@ -417,4 +424,29 @@ impl VkPhysicalDeviceProperties {
         unsafe { CStr::from_ptr(self.deviceName.as_ptr()) }
             .to_owned()
     } 
+}
+
+struct ShaderModule {
+    handle: VkShaderModule,
+}
+
+impl ShaderModule {
+    fn new(device: &Device) -> std::io::Result<Self> {
+        let mut file = std::fs::File::open("data/headless.comp.spv")?;
+        let mut buffer = Vec::<u8>::new();
+        let bytes = file.read_to_end(&mut buffer)?;
+        assert!(bytes > 0);
+        assert_eq!(bytes % 4, 0);
+        unsafe {
+            let mut shader_module = MaybeUninit::<VkShaderModule>::zeroed();
+            let create_info = VkShaderModuleCreateInfo::new(bytes, std::mem::transmute(buffer.as_mut_ptr()));
+                vkCreateShaderModule(device.handle, &create_info, ptr::null(), shader_module.as_mut_ptr())
+                    .into_result()
+                    .unwrap();
+            let shader_module = shader_module.assume_init();
+            Ok(ShaderModule {
+                handle: shader_module,
+            })
+        }
+    }
 }
