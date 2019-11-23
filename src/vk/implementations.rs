@@ -4,7 +4,7 @@
 
 use crate::vk::*;
 
-use libc::{c_char, c_float, size_t};
+use libc::{c_char, c_float, size_t, c_void};
 use std::ptr;
 
 const VK_API_VERSION_1_1: u32 = 4198400;
@@ -352,13 +352,12 @@ impl VkPipelineShaderStageCreateInfo {
 
 impl VkComputePipelineCreateInfo {
     pub fn new(
-        flags: VkPipelineCreateFlags,
         stage: VkPipelineShaderStageCreateInfo,
         layout: VkPipelineLayout) -> Self {
         VkComputePipelineCreateInfo {
             sType: VkStructureType::VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
             pNext: ptr::null(),
-            flags: flags,
+            flags: 0,
             stage: stage,
             layout: layout,
             basePipelineHandle: ptr::null_mut(),
@@ -375,6 +374,31 @@ impl VkShaderModuleCreateInfo {
             flags: 0,
             codeSize: code_size_bytes,
             pCode: code,
+        }
+    }
+}
+
+impl VkSpecializationMapEntry {
+    pub fn new(constant_id: u32, offset: u32, size: size_t) -> Self {
+        VkSpecializationMapEntry {
+            constantID: constant_id,
+            offset: offset,
+            size: size,
+        }
+    }
+}
+
+impl VkSpecializationInfo {
+    pub fn new(
+        max_entry_count: u32, 
+        entries: *const VkSpecializationMapEntry,
+        data_size: size_t,
+        data: *const c_void) -> Self {
+        VkSpecializationInfo {
+            mapEntryCount: max_entry_count,
+            pMapEntries: entries,
+            dataSize: data_size,
+            pData: data,
         }
     }
 }

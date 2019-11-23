@@ -109,15 +109,18 @@ pub fn initialize() {
 
     let command_pool = device.create_command_pool().unwrap();
     let staging_buffer = StagingBuffer::new(&device, command_pool);
-    let compute_pipeline = ComputePipeline::new(&device, &staging_buffer);
+    let compute_pipeline = ComputePipeline::new(&device, &staging_buffer, command_pool);
 }
 
 struct ComputePipeline {
+    handle: VkPipeline,
     shader_module: ShaderModule,
+    command_buffer: VkCommandBuffer,
+    fence: VkFence,
 }
 
 impl ComputePipeline {
-    fn new(device: &Device, staging_buffer: &StagingBuffer) -> Self {
+    fn new(device: &Device, staging_buffer: &StagingBuffer, command_pool: VkCommandPool) -> Self {
         unsafe {
             let mut descriptor_pool = MaybeUninit::<VkDescriptorPool>::zeroed();
             {
@@ -171,13 +174,56 @@ impl ComputePipeline {
                     .unwrap();
             }
             let pipeline_cache = pipeline_cache.assume_init();
+            let mut compute_pipeline = MaybeUninit::<VkPipeline>::zeroed();
             let shader_module = ShaderModule::new(device)
                 .unwrap();
             {
-                
+                #[repr(C)]
+                struct SpecializationData {
+                    element_count: u32,
+                }
+                let data = SpecializationData { element_count: staging_buffer.buffer_element_count as u32 };
+                let entry = VkSpecializationMapEntry::new(0, 0, mem::size_of::<u32>());
+                let spec_info = VkSpecializationInfo::new(
+                    1,
+                    &entry,
+                    mem::size_of::<SpecializationData>(),
+                    &data as *const _ as *const c_void
+                );
+                let name = CString::new("main").unwrap();
+                let stage = VkPipelineShaderStageCreateInfo::new(
+                    VkShaderStageFlagBits::VK_SHADER_STAGE_COMPUTE_BIT,
+                    shader_module.handle,
+                    name.as_ptr(),
+                    &spec_info
+                );
+                let create_info = VkComputePipelineCreateInfo::new(stage, pipeline_layout);
+                vkCreateComputePipelines(device.handle, pipeline_cache, 1, &create_info, ptr::null(), compute_pipeline.as_mut_ptr())
+                    .into_result()
+                    .unwrap();
             }
+            let compute_pipeline = compute_pipeline.assume_init();
+            let mut command_buffer = MaybeUninit::<VkCommandBuffer>::zeroed();
+            {
+                let alloc_info = VkCommandBufferAllocateInfo::new(command_pool, VkCommandBufferLevel::VK_COMMAND_BUFFER_LEVEL_PRIMARY, 1);
+                vkAllocateCommandBuffers(device.handle, &alloc_info, command_buffer.as_mut_ptr())
+                    .into_result()
+                    .unwrap();
+            }
+            let command_buffer = command_buffer.assume_init();
+            let mut fence = MaybeUninit::<VkFence>::zeroed();
+            {
+                let create_info = VkFenceCreateInfo::new(VkFenceCreateFlagBits::VK_FENCE_CREATE_SIGNALED_BIT as VkFlags);
+                vkCreateFence(device.handle, &create_info, ptr::null(), fence.as_mut_ptr())
+                    .into_result()
+                    .unwrap();
+            }
+            let fence = fence.assume_init();
             ComputePipeline {
+                handle: compute_pipeline,
                 shader_module: shader_module,
+                command_buffer: command_buffer,
+                fence: fence,
             }
         }
     }

@@ -961,6 +961,14 @@ pub struct VkShaderModuleCreateInfo {
     pub pCode: *const u32,
 }
 
+// @see https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/VkFenceCreateFlagBits.html
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub enum VkFenceCreateFlagBits {
+    VK_FENCE_CREATE_SIGNALED_BIT = 0x00000001,
+    VK_FENCE_CREATE_FLAG_BITS_MAX_ENUM = 0x7FFFFFFF
+}
+
 #[link(name = "vulkan")]
 extern "C" {
     // @see https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/vkCreateInstance.html
