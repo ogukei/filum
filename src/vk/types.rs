@@ -24,6 +24,13 @@ pub type VkQueryControlFlags = VkFlags;
 pub type VkQueryPipelineStatisticFlags = VkFlags;
 pub type VkFenceCreateFlags = VkFlags;
 pub type VkPipelineStageFlags = VkFlags;
+pub type VkDescriptorPoolCreateFlags = VkFlags;
+pub type VkDescriptorSetLayoutCreateFlags = VkFlags;
+pub type VkShaderStageFlags = VkFlags;
+pub type VkPipelineLayoutCreateFlags = VkFlags;
+pub type VkPipelineCacheCreateFlags = VkFlags;
+pub type VkPipelineCreateFlags = VkFlags;
+pub type VkPipelineShaderStageCreateFlags = VkFlags;
 
 #[repr(C)]
 pub struct VkInstanceOpaque { _private: [u8; 0] }
@@ -61,6 +68,36 @@ pub type VkFence = *mut VkFenceOpaque;
 #[repr(C)]
 pub struct VkSemaphoreOpaque { _private: [u8; 0] }
 pub type VkSemaphore = *mut VkSemaphoreOpaque;
+#[repr(C)]
+pub struct VkDescriptorPoolOpaque { _private: [u8; 0] }
+pub type VkDescriptorPool = *mut VkDescriptorPoolOpaque;
+#[repr(C)]
+pub struct VkDescriptorSetLayoutOpaque { _private: [u8; 0] }
+pub type VkDescriptorSetLayout = *mut VkDescriptorSetLayoutOpaque;
+#[repr(C)]
+pub struct VkSamplerOpaque { _private: [u8; 0] }
+pub type VkSampler = *mut VkSamplerOpaque;
+#[repr(C)]
+pub struct VkPipelineLayoutOpaque { _private: [u8; 0] }
+pub type VkPipelineLayout = *mut VkPipelineLayoutOpaque;
+#[repr(C)]
+pub struct VkDescriptorSetOpaque { _private: [u8; 0] }
+pub type VkDescriptorSet = *mut VkDescriptorSetOpaque;
+#[repr(C)]
+pub struct VkBufferViewOpaque { _private: [u8; 0] }
+pub type VkBufferView = *mut VkBufferViewOpaque;
+#[repr(C)]
+pub struct VkImageViewOpaque { _private: [u8; 0] }
+pub type VkImageView = *mut VkImageViewOpaque;
+#[repr(C)]
+pub struct VkPipelineCacheOpaque { _private: [u8; 0] }
+pub type VkPipelineCache = *mut VkPipelineCacheOpaque;
+#[repr(C)]
+pub struct VkPipelineOpaque { _private: [u8; 0] }
+pub type VkPipeline = *mut VkPipelineOpaque;
+#[repr(C)]
+pub struct VkShaderModuleOpaque { _private: [u8; 0] }
+pub type VkShaderModule = *mut VkShaderModuleOpaque;
 
 pub const VK_MAX_PHYSICAL_DEVICE_NAME_SIZE: size_t = 256;
 pub const VK_UUID_SIZE: size_t = 16;
@@ -680,6 +717,239 @@ pub struct VkSubmitInfo {
     pub pSignalSemaphores: *const VkSemaphore,
 }
 
+// @see https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/VkDescriptorType.html
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub enum VkDescriptorType {
+    VK_DESCRIPTOR_TYPE_SAMPLER = 0,
+    VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER = 1,
+    VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE = 2,
+    VK_DESCRIPTOR_TYPE_STORAGE_IMAGE = 3,
+    VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER = 4,
+    VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER = 5,
+    VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER = 6,
+    VK_DESCRIPTOR_TYPE_STORAGE_BUFFER = 7,
+    VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC = 8,
+    VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC = 9,
+    VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT = 10,
+    VK_DESCRIPTOR_TYPE_INLINE_UNIFORM_BLOCK_EXT = 1000138000,
+    VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_NV = 1000165000,
+    VK_DESCRIPTOR_TYPE_MAX_ENUM = 0x7FFFFFFF,
+}
+
+// @see https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/VkDescriptorPoolSize.html
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub struct VkDescriptorPoolSize {
+    pub descriptorType: VkDescriptorType,
+    pub descriptorCount: u32,
+}
+
+// @see https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/VkDescriptorPoolCreateInfo.html
+#[repr(C)]
+pub struct VkDescriptorPoolCreateInfo {
+    pub sType: VkStructureType,
+    pub pNext: *const c_void,
+    pub flags: VkDescriptorPoolCreateFlags,
+    pub maxSets: u32,
+    pub poolSizeCount: u32,
+    pub pPoolSizes: *const VkDescriptorPoolSize,
+}
+
+// @see https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/VkDescriptorSetLayoutBinding.html
+#[repr(C)]
+pub struct VkDescriptorSetLayoutBinding {
+    pub binding: u32,
+    pub descriptorType: VkDescriptorType,
+    pub descriptorCount: u32,
+    pub stageFlags: VkShaderStageFlags,
+    pub pImmutableSamplers: *const VkSampler,
+}
+
+// @see https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/VkDescriptorSetLayoutCreateInfo.html
+#[repr(C)]
+pub struct VkDescriptorSetLayoutCreateInfo {
+    pub sType: VkStructureType,
+    pub pNext: *const c_void,
+    pub flags: VkDescriptorSetLayoutCreateFlags,
+    pub bindingCount: u32,
+    pub pBindings: *const VkDescriptorSetLayoutBinding,
+}
+
+// @see https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/VkPipelineLayoutCreateInfo.html
+#[repr(C)]
+pub struct VkPipelineLayoutCreateInfo {
+    pub sType: VkStructureType,
+    pub pNext: *const c_void,
+    pub flags: VkPipelineLayoutCreateFlags,
+    pub setLayoutCount: u32,
+    pub pSetLayouts: *const VkDescriptorSetLayout,
+    pub pushConstantRangeCount: u32,
+    pub pPushConstantRanges: *const VkPushConstantRange,
+}
+
+// @see https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/VkPushConstantRange.html
+#[repr(C)]
+pub struct VkPushConstantRange {
+    pub stageFlags: VkShaderStageFlags,
+    pub offset: u32,
+    pub size: u32,
+}
+
+// @see https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/VkDescriptorSetAllocateInfo.html
+#[repr(C)]
+pub struct VkDescriptorSetAllocateInfo {
+    pub sType: VkStructureType,
+    pub pNext: *const c_void,
+    pub descriptorPool: VkDescriptorPool,
+    pub descriptorSetCount: u32,
+    pub pSetLayouts: *const VkDescriptorSetLayout,
+}
+
+// @see https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/VkWriteDescriptorSet.html
+#[repr(C)]
+pub struct VkWriteDescriptorSet {
+    pub sType: VkStructureType,
+    pub pNext: *const c_void,
+    pub dstSet: VkDescriptorSet,
+    pub dstBinding: u32,
+    pub dstArrayElement: u32,
+    pub descriptorCount: u32,
+    pub descriptorType: VkDescriptorType,
+    pub pImageInfo: *const VkDescriptorImageInfo,
+    pub pBufferInfo: *const VkDescriptorBufferInfo,
+    pub pTexelBufferView: *const VkBufferView,
+}
+
+// @see https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/VkDescriptorImageInfo.html
+#[repr(C)]
+pub struct VkDescriptorImageInfo {
+    pub sampler: VkSampler,
+    pub imageView: VkImageView,
+    pub imageLayout: VkImageLayout,
+}
+
+// @see https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/VkDescriptorBufferInfo.html
+#[repr(C)]
+pub struct VkDescriptorBufferInfo {
+    pub buffer: VkBuffer,
+    pub offset: VkDeviceSize,
+    pub range: VkDeviceSize,
+}
+
+// @see https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/VkCopyDescriptorSet.html
+#[repr(C)]
+pub struct VkCopyDescriptorSet {
+    pub sType: VkStructureType,
+    pub pNext: *const c_void,
+    pub srcSet: VkDescriptorSet,
+    pub srcBinding: u32,
+    pub srcArrayElement: u32,
+    pub dstSet: VkDescriptorSet,
+    pub dstBinding: u32,
+    pub dstArrayElement: u32,
+    pub descriptorCount: u32,
+}
+
+// @see https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/VkImageLayout.html
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub enum VkImageLayout {
+    VK_IMAGE_LAYOUT_UNDEFINED = 0,
+    VK_IMAGE_LAYOUT_GENERAL = 1,
+    VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL = 2,
+    VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL = 3,
+    VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL = 4,
+    VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL = 5,
+    VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL = 6,
+    VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL = 7,
+    VK_IMAGE_LAYOUT_PREINITIALIZED = 8,
+    VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_STENCIL_ATTACHMENT_OPTIMAL = 1000117000,
+    VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_STENCIL_READ_ONLY_OPTIMAL = 1000117001,
+    VK_IMAGE_LAYOUT_PRESENT_SRC_KHR = 1000001002,
+    VK_IMAGE_LAYOUT_SHARED_PRESENT_KHR = 1000111000,
+    VK_IMAGE_LAYOUT_SHADING_RATE_OPTIMAL_NV = 1000164003,
+    VK_IMAGE_LAYOUT_FRAGMENT_DENSITY_MAP_OPTIMAL_EXT = 1000218000,
+    VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL_KHR = 1000241000,
+    VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_OPTIMAL_KHR = 1000241001,
+    VK_IMAGE_LAYOUT_STENCIL_ATTACHMENT_OPTIMAL_KHR = 1000241002,
+    VK_IMAGE_LAYOUT_STENCIL_READ_ONLY_OPTIMAL_KHR = 1000241003,
+    VK_IMAGE_LAYOUT_MAX_ENUM = 0x7FFFFFFF
+}
+
+// @see https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/VkShaderStageFlagBits.html
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub enum VkShaderStageFlagBits {
+    VK_SHADER_STAGE_VERTEX_BIT = 0x00000001,
+    VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT = 0x00000002,
+    VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT = 0x00000004,
+    VK_SHADER_STAGE_GEOMETRY_BIT = 0x00000008,
+    VK_SHADER_STAGE_FRAGMENT_BIT = 0x00000010,
+    VK_SHADER_STAGE_COMPUTE_BIT = 0x00000020,
+    VK_SHADER_STAGE_ALL_GRAPHICS = 0x0000001F,
+    VK_SHADER_STAGE_ALL = 0x7FFFFFFF,
+    VK_SHADER_STAGE_RAYGEN_BIT_NV = 0x00000100,
+    VK_SHADER_STAGE_ANY_HIT_BIT_NV = 0x00000200,
+    VK_SHADER_STAGE_CLOSEST_HIT_BIT_NV = 0x00000400,
+    VK_SHADER_STAGE_MISS_BIT_NV = 0x00000800,
+    VK_SHADER_STAGE_INTERSECTION_BIT_NV = 0x00001000,
+    VK_SHADER_STAGE_CALLABLE_BIT_NV = 0x00002000,
+    VK_SHADER_STAGE_TASK_BIT_NV = 0x00000040,
+    VK_SHADER_STAGE_MESH_BIT_NV = 0x00000080,
+}
+
+// @see https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/VkComputePipelineCreateInfo.html
+#[repr(C)]
+pub struct VkComputePipelineCreateInfo {
+    pub sType: VkStructureType,
+    pub pNext: *const c_void,
+    pub flags: VkPipelineCreateFlags,
+    pub stage: VkPipelineShaderStageCreateInfo,
+    pub layout: VkPipelineLayout,
+    pub basePipelineHandle: VkPipeline,
+    pub basePipelineIndex: i32,
+}
+
+// @see https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/VkPipelineShaderStageCreateInfo.html
+#[repr(C)]
+pub struct VkPipelineShaderStageCreateInfo {
+    pub sType: VkStructureType,
+    pub pNext: *const c_void,
+    pub flags: VkPipelineShaderStageCreateFlags,
+    pub stage: VkShaderStageFlagBits,
+    pub module: VkShaderModule,
+    pub pName: *const c_char,
+    pub pSpecializationInfo: *const VkSpecializationInfo,
+}
+
+// @see https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/VkPipelineCacheCreateInfo.html
+#[repr(C)]
+pub struct VkPipelineCacheCreateInfo {
+    pub sType: VkStructureType,
+    pub pNext: *const c_void,
+    pub flags: VkPipelineCacheCreateFlags,
+    pub initialDataSize: size_t,
+    pub pInitialData: *const c_void,
+}
+
+// @see https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/VkSpecializationInfo.html
+#[repr(C)]
+pub struct VkSpecializationInfo {
+    pub mapEntryCount: u32,
+    pub pMapEntries: *const VkSpecializationMapEntry,
+    pub dataSize: size_t,
+    pub pData: *const c_void,
+}
+
+// @see https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/VkSpecializationMapEntry.html
+#[repr(C)]
+pub struct VkSpecializationMapEntry {
+    pub constantID: u32,
+    pub offset: u32,
+    pub size: size_t,
+}
+
 #[link(name = "vulkan")]
 extern "C" {
     // @see https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/vkCreateInstance.html
@@ -836,4 +1106,56 @@ extern "C" {
         regionCount: u32,
         pRegions: *const VkBufferCopy,
     );
+    // @see https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/vkCreateDescriptorPool.html
+    pub fn vkCreateDescriptorPool(
+        device: VkDevice,
+        pCreateInfo: *const VkDescriptorPoolCreateInfo,
+        pAllocator: *const VkAllocationCallbacks,
+        pDescriptorPool: *mut VkDescriptorPool,
+    ) -> VkResult;
+    // @see https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/vkCreateDescriptorSetLayout.html
+    pub fn vkCreateDescriptorSetLayout(
+        device: VkDevice,
+        pCreateInfo: *const VkDescriptorSetLayoutCreateInfo,
+        pAllocator: *const VkAllocationCallbacks,
+        pSetLayout: *mut VkDescriptorSetLayout,
+    ) -> VkResult;
+    // @see https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/vkCreatePipelineLayout.html
+    pub fn vkCreatePipelineLayout(
+        device: VkDevice,
+        pCreateInfo: *const VkPipelineLayoutCreateInfo,
+        pAllocator: *const VkAllocationCallbacks,
+        pPipelineLayout: *mut VkPipelineLayout,
+    ) -> VkResult;
+    // @see https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/vkAllocateDescriptorSets.html
+    pub fn vkAllocateDescriptorSets(
+        device: VkDevice,
+        pAllocateInfo: *const VkDescriptorSetAllocateInfo,
+        pDescriptorSets: *mut VkDescriptorSet,
+    ) -> VkResult;
+    // @see https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/vkUpdateDescriptorSets.html
+    pub fn vkUpdateDescriptorSets(
+        device: VkDevice,
+        descriptorWriteCount: u32,
+        pDescriptorWrites: *const VkWriteDescriptorSet,
+        descriptorCopyCount: u32,
+        pDescriptorCopies: *const VkCopyDescriptorSet,
+    );
+    // @see https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/vkCreatePipelineCache.html
+    pub fn vkCreatePipelineCache(
+        device: VkDevice,
+        pCreateInfo: *const VkPipelineCacheCreateInfo,
+        pAllocator: *const VkAllocationCallbacks,
+        pPipelineCache: *mut VkPipelineCache,
+    ) -> VkResult;
+    // @see https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/vkCreateComputePipelines.html
+    pub fn vkCreateComputePipelines(
+        device: VkDevice,
+        pipelineCache: VkPipelineCache,
+        createInfoCount: u32,
+        pCreateInfos: *const VkComputePipelineCreateInfo,
+        pAllocator: *const VkAllocationCallbacks,
+        pPipelines: *mut VkPipeline,
+    ) -> VkResult;
+    
 }
