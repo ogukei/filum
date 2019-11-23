@@ -110,10 +110,138 @@ pub fn initialize() {
     let command_pool = device.create_command_pool().unwrap();
     let staging_buffer = StagingBuffer::new(&device, command_pool);
     let compute_pipeline = ComputePipeline::new(&device, &staging_buffer, command_pool);
+    let command_dispatch = CommandDispatch::new(&device, &staging_buffer, &compute_pipeline);
+    println!("{:?}", command_dispatch.output);
+}
+
+struct CommandDispatch {
+    output: Vec<u32>,
+}
+
+impl CommandDispatch {
+    fn new(device: &Device, staging_buffer: &StagingBuffer, pipeline: &ComputePipeline) -> Self {
+        unsafe {
+            let command_buffer = pipeline.command_buffer;
+            let begin_info = VkCommandBufferBeginInfo::new();
+            vkBeginCommandBuffer(command_buffer, &begin_info)
+                .into_result()
+                .unwrap();
+            // Barrier to ensure that input buffer transfer is finished before compute shader reads from it
+            {
+                let buffer_barrier = VkBufferMemoryBarrier::new(
+                    VkAccessFlagBits::VK_ACCESS_HOST_WRITE_BIT as VkFlags,
+                    VkAccessFlagBits::VK_ACCESS_SHADER_READ_BIT as VkFlags,
+                    staging_buffer.device_buffer,
+                    VK_WHOLE_SIZE,
+                );
+                vkCmdPipelineBarrier(
+                    command_buffer,
+                    VkPipelineStageFlagBits::VK_PIPELINE_STAGE_HOST_BIT as VkFlags,
+                    VkPipelineStageFlagBits::VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT as VkFlags,
+                    VK_FLAGS_NONE,
+                    0, ptr::null(),
+                    1, &buffer_barrier,
+                    0, ptr::null(),
+                );
+            }
+            vkCmdBindPipeline(
+                command_buffer,
+                VkPipelineBindPoint::VK_PIPELINE_BIND_POINT_COMPUTE,
+                pipeline.handle);
+            vkCmdBindDescriptorSets(
+                command_buffer,
+                VkPipelineBindPoint::VK_PIPELINE_BIND_POINT_COMPUTE,
+                pipeline.layout,
+                0,
+                1,
+                &pipeline.descriptor_set,
+                0,
+                ptr::null()
+            );
+            vkCmdDispatch(command_buffer, staging_buffer.buffer_element_count as u32, 1, 1);
+            // Barrier to ensure that shader writes are finished before buffer is read back from GPU
+            {
+                let buffer_barrier = VkBufferMemoryBarrier::new(
+                    VkAccessFlagBits::VK_ACCESS_SHADER_WRITE_BIT as VkFlags,
+                    VkAccessFlagBits::VK_ACCESS_TRANSFER_READ_BIT as VkFlags,
+                    staging_buffer.device_buffer,
+                    VK_WHOLE_SIZE,
+                );
+                vkCmdPipelineBarrier(
+                    command_buffer,
+                    VkPipelineStageFlagBits::VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT as VkFlags,
+                    VkPipelineStageFlagBits::VK_PIPELINE_STAGE_TRANSFER_BIT as VkFlags,
+                    VK_FLAGS_NONE,
+                    0, ptr::null(),
+                    1, &buffer_barrier,
+                    0, ptr::null(),
+                );
+            }
+            // Read back to host visible buffer
+            let copy_region = VkBufferCopy::new(staging_buffer.buffer_size);
+            vkCmdCopyBuffer(
+                command_buffer, 
+                staging_buffer.device_buffer,
+                staging_buffer.host_buffer,
+                1,
+                &copy_region);
+            // Barrier to ensure that buffer copy is finished before host reading from it
+            {
+                let buffer_barrier = VkBufferMemoryBarrier::new(
+                    VkAccessFlagBits::VK_ACCESS_TRANSFER_WRITE_BIT as VkFlags,
+                    VkAccessFlagBits::VK_ACCESS_HOST_READ_BIT as VkFlags,
+                    staging_buffer.host_buffer,
+                    VK_WHOLE_SIZE,
+                );
+                vkCmdPipelineBarrier(
+                    command_buffer,
+                    VkPipelineStageFlagBits::VK_PIPELINE_STAGE_TRANSFER_BIT as VkFlags,
+                    VkPipelineStageFlagBits::VK_PIPELINE_STAGE_HOST_BIT as VkFlags,
+                    VK_FLAGS_NONE,
+                    0, ptr::null(),
+                    1, &buffer_barrier,
+                    0, ptr::null(),
+                );
+            }
+            vkEndCommandBuffer(command_buffer);
+            // submit compute work
+            let fence = pipeline.fence;
+            vkResetFences(device.handle, 1, &fence)
+                .into_result()
+                .unwrap();
+            let wait_mask = VkPipelineStageFlagBits::VK_PIPELINE_STAGE_TRANSFER_BIT as VkPipelineStageFlags;
+            let submit_info = VkSubmitInfo::with_command_buffer_wait(1, &command_buffer, &wait_mask);
+            vkQueueSubmit(device.queue.handle, 1, &submit_info, fence);
+            vkWaitForFences(device.handle, 1, &fence, VK_TRUE, u64::max_value())
+                .into_result()
+                .unwrap();
+            // Make device writes visible to the host
+            let mut mapped = MaybeUninit::<*mut c_void>::zeroed();
+            vkMapMemory(device.handle, staging_buffer.host_memory, 0, VK_WHOLE_SIZE, 0, mapped.as_mut_ptr());
+            let mapped = mapped.assume_init();
+            let mapped_range = VkMappedMemoryRange::new(staging_buffer.host_memory, 0, VK_WHOLE_SIZE);
+            vkInvalidateMappedMemoryRanges(device.handle, 1, &mapped_range);
+            let mut output: Vec<u32> = Vec::with_capacity(staging_buffer.buffer_element_count);
+            {
+                output.resize(staging_buffer.buffer_element_count, 0);
+                ptr::copy_nonoverlapping(mapped, output.as_mut_ptr() as *mut c_void, staging_buffer.buffer_size as usize);
+            }
+            vkUnmapMemory(device.handle, staging_buffer.host_memory);
+            // compute work done
+            vkQueueWaitIdle(device.queue.handle);
+            CommandDispatch { output: output }
+        }
+    }
+}
+
+impl CommandDispatch {
+
 }
 
 struct ComputePipeline {
     handle: VkPipeline,
+    layout: VkPipelineLayout,
+    descriptor_set: VkDescriptorSet,
     shader_module: ShaderModule,
     command_buffer: VkCommandBuffer,
     fence: VkFence,
@@ -221,6 +349,8 @@ impl ComputePipeline {
             let fence = fence.assume_init();
             ComputePipeline {
                 handle: compute_pipeline,
+                layout: pipeline_layout,
+                descriptor_set: descriptor_set,
                 shader_module: shader_module,
                 command_buffer: command_buffer,
                 fence: fence,
@@ -246,6 +376,9 @@ impl StagingBuffer {
             let buffer_size = (BUFFER_ELEMENTS * mem::size_of::<u32>()) as VkDeviceSize;
             let mut input: Vec<u32> = Vec::with_capacity(BUFFER_ELEMENTS);
             input.resize(BUFFER_ELEMENTS, 0);
+            for (i, v) in input.iter_mut().enumerate() {
+                *v = i as u32
+            }
             // host buffer
             let (host_buffer, host_memory) = device.create_buffer(
                 VkBufferUsageFlagBits::VK_BUFFER_USAGE_TRANSFER_SRC_BIT as u32 | 
