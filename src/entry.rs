@@ -21,7 +21,7 @@ impl Instance {
         let application_name = CString::new("stala")?;
         let engine_name = CString::new("Stalagmite Engine")?;
         let app_info = VkApplicationInfo::new(application_name.as_ptr(), 0, engine_name.as_ptr(), 0);
-        let instance_info = VkInstanceCreateInfo::new(app_info);
+        let instance_info = VkInstanceCreateInfo::new(&app_info);
         unsafe {
             let mut handle = MaybeUninit::<VkInstance>::zeroed();
             vkCreateInstance(&instance_info, ptr::null(), handle.as_mut_ptr())
