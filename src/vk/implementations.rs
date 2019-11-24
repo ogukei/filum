@@ -29,7 +29,7 @@ impl VkApplicationInfo {
 }
 
 impl VkInstanceCreateInfo {
-    pub fn new(p_application_info: VkApplicationInfo) -> Self {
+    pub fn new(p_application_info: *const VkApplicationInfo) -> Self {
         VkInstanceCreateInfo { 
             sType: VkStructureType::VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
             pNext: ptr::null(),

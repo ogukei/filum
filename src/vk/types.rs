@@ -246,7 +246,7 @@ pub struct VkInstanceCreateInfo {
     pub sType: VkStructureType,
     pub pNext: *const c_void,
     pub flags: VkFlags,
-    pub pApplicationInfo: VkApplicationInfo,
+    pub pApplicationInfo: *const VkApplicationInfo,
     pub enabledLayerCount: u32,
     pub ppEnabledLayerNames: *const *const c_char,
     pub enabledExtensionCount: u32,
