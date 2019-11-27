@@ -56,6 +56,12 @@ impl Instance {
     }
 }
 
+impl Drop for Instance {
+    fn drop(&mut self) {
+        println!("Drop Instance")
+    }
+}
+
 #[derive(Debug)]
 pub struct PhysicalDevice<'a> {
     handle: VkPhysicalDevice,

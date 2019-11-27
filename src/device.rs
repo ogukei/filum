@@ -93,6 +93,12 @@ impl<'a> Device<'a> {
     }
 }
 
+impl<'a> Drop for Device<'a> {
+    fn drop(&mut self) {
+        println!("Drop Device")
+    }
+}
+
 pub struct CommandPool<'a, 'b: 'a> {
     handle: VkCommandPool,
     device: &'b Device<'a>,
@@ -121,6 +127,12 @@ impl<'a, 'b> CommandPool<'a, 'b> {
     #[inline]
     pub fn device(&self) -> &Device {
         self.device
+    }
+}
+
+impl<'a, 'b> Drop for CommandPool<'a, 'b> {
+    fn drop(&mut self) {
+        println!("Drop CommandPool")
     }
 }
 
@@ -220,5 +232,11 @@ impl<'a, 'b> ShaderModule<'a, 'b> {
     #[inline]
     pub fn handle(&self) -> VkShaderModule {
         self.handle
+    }
+}
+
+impl<'a, 'b> Drop for ShaderModule<'a, 'b> {
+    fn drop(&mut self) {
+        println!("Drop ShaderModule")
     }
 }

@@ -264,6 +264,12 @@ impl<'a, 'b, 'c, 'd> ComputePipeline<'a, 'b, 'c, 'd> {
     }
 }
 
+impl<'a, 'b, 'c, 'd> Drop for ComputePipeline<'a, 'b, 'c, 'd> {
+    fn drop(&mut self) {
+        println!("Drop ComputePipeline")
+    }
+}
+
 pub struct StagingBuffer<'a, 'b: 'a, 'c: 'b> {
     buffer_element_count: usize,
     buffer_size: VkDeviceSize,
@@ -358,5 +364,11 @@ impl<'a, 'b, 'c> StagingBuffer<'a, 'b, 'c> {
 
     pub fn command_pool(&self) -> &CommandPool {
         self.command_pool
+    }
+}
+
+impl<'a, 'b, 'c> Drop for StagingBuffer<'a, 'b, 'c> {
+    fn drop(&mut self) {
+        println!("Drop StagingBuffer")
     }
 }
