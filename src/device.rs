@@ -93,7 +93,7 @@ impl<'a> Device<'a> {
     }
 }
 
-pub struct CommandPool<'a, 'b> {
+pub struct CommandPool<'a, 'b: 'a> {
     handle: VkCommandPool,
     device: &'b Device<'a>,
 }
@@ -116,6 +116,11 @@ impl<'a, 'b> CommandPool<'a, 'b> {
     #[inline]
     pub fn handle(&self) -> VkCommandPool {
         self.handle
+    }
+
+    #[inline]
+    pub fn device(&self) -> &Device {
+        self.device
     }
 }
 
@@ -186,26 +191,28 @@ impl<'a> DeviceBuilder<'a> {
     }
 }
 
-pub struct ShaderModule {
+pub struct ShaderModule<'a, 'b: 'a> {
     handle: VkShaderModule,
+    device: &'b Device<'a>,
 }
 
-impl ShaderModule {
-    pub fn new(device: &Device) -> std::io::Result<Self> {
+impl<'a, 'b> ShaderModule<'a, 'b> {
+    pub fn new(device: &'b Device<'a>) -> std::io::Result<Self> {
         let mut file = std::fs::File::open("data/headless.comp.spv")?;
         let mut buffer = Vec::<u8>::new();
         let bytes = file.read_to_end(&mut buffer)?;
         assert!(bytes > 0);
         assert_eq!(bytes % 4, 0);
         unsafe {
-            let mut shader_module = MaybeUninit::<VkShaderModule>::zeroed();
+            let mut handle = MaybeUninit::<VkShaderModule>::zeroed();
             let create_info = VkShaderModuleCreateInfo::new(bytes, std::mem::transmute(buffer.as_mut_ptr()));
-                vkCreateShaderModule(device.handle, &create_info, ptr::null(), shader_module.as_mut_ptr())
-                    .into_result()
-                    .unwrap();
-            let shader_module = shader_module.assume_init();
+            vkCreateShaderModule(device.handle, &create_info, ptr::null(), handle.as_mut_ptr())
+                .into_result()
+                .unwrap();
+            let handle = handle.assume_init();
             Ok(ShaderModule {
-                handle: shader_module,
+                handle: handle,
+                device: device,
             })
         }
     }

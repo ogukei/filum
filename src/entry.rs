@@ -10,10 +10,9 @@ pub fn initialize() {
         .into_device()
         .unwrap();
     println!("{:?}", device.physical_device().properties().device_name());
-
-    let command_pool = CommandPool::new(&device).unwrap().handle();
-    let staging_buffer = StagingBuffer::new(&device, command_pool);
-    let compute_pipeline = ComputePipeline::new(&device, &staging_buffer, command_pool);
-    let command_dispatch = CommandDispatch::new(&device, &staging_buffer, &compute_pipeline);
+    let command_pool = CommandPool::new(&device).unwrap();
+    let staging_buffer = StagingBuffer::new(&command_pool);
+    let compute_pipeline = ComputePipeline::new(&staging_buffer);
+    let command_dispatch = CommandDispatch::new(&compute_pipeline);
     println!("{:?}", command_dispatch.output);
 }

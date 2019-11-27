@@ -3,7 +3,7 @@
 use crate::vk::*;
 use crate::error::Result;
 use crate::error::ErrorCode;
-use super::device::{Device, ShaderModule};
+use super::device::{Device, ShaderModule, CommandPool};
 
 use std::ptr;
 use std::mem;
@@ -18,7 +18,9 @@ pub struct CommandDispatch {
 }
 
 impl CommandDispatch {
-    pub fn new(device: &Device, staging_buffer: &StagingBuffer, pipeline: &ComputePipeline) -> Self {
+    pub fn new(pipeline: &ComputePipeline) -> Self {
+        let staging_buffer = pipeline.staging_buffer();
+        let device = staging_buffer.command_pool().device();
         unsafe {
             let command_buffer = pipeline.command_buffer;
             let begin_info = VkCommandBufferBeginInfo::new();
@@ -133,17 +135,20 @@ impl CommandDispatch {
     }
 }
 
-pub struct ComputePipeline {
+pub struct ComputePipeline<'a, 'b: 'a, 'c: 'b, 'd: 'c> {
     handle: VkPipeline,
     layout: VkPipelineLayout,
     descriptor_set: VkDescriptorSet,
-    shader_module: ShaderModule,
     command_buffer: VkCommandBuffer,
     fence: VkFence,
+    shader_module: ShaderModule<'a, 'b>,
+    staging_buffer: &'d StagingBuffer<'a, 'b, 'c>,
 }
 
-impl ComputePipeline {
-    pub fn new(device: &Device, staging_buffer: &StagingBuffer, command_pool: VkCommandPool) -> Self {
+impl<'a, 'b, 'c, 'd> ComputePipeline<'a, 'b, 'c, 'd> {
+    pub fn new(staging_buffer: &'d StagingBuffer<'a, 'b, 'c>) -> Self {
+        let command_pool = staging_buffer.command_pool();
+        let device = command_pool.device();
         unsafe {
             let mut descriptor_pool = MaybeUninit::<VkDescriptorPool>::zeroed();
             {
@@ -228,7 +233,7 @@ impl ComputePipeline {
             let compute_pipeline = compute_pipeline.assume_init();
             let mut command_buffer = MaybeUninit::<VkCommandBuffer>::zeroed();
             {
-                let alloc_info = VkCommandBufferAllocateInfo::new(command_pool, VkCommandBufferLevel::VK_COMMAND_BUFFER_LEVEL_PRIMARY, 1);
+                let alloc_info = VkCommandBufferAllocateInfo::new(command_pool.handle(), VkCommandBufferLevel::VK_COMMAND_BUFFER_LEVEL_PRIMARY, 1);
                 vkAllocateCommandBuffers(device.handle(), &alloc_info, command_buffer.as_mut_ptr())
                     .into_result()
                     .unwrap();
@@ -249,24 +254,31 @@ impl ComputePipeline {
                 shader_module: shader_module,
                 command_buffer: command_buffer,
                 fence: fence,
+                staging_buffer: staging_buffer,
             }
         }
     }
+
+    pub fn staging_buffer(&self) -> &StagingBuffer {
+        self.staging_buffer
+    }
 }
 
-pub struct StagingBuffer {
+pub struct StagingBuffer<'a, 'b: 'a, 'c: 'b> {
     buffer_element_count: usize,
     buffer_size: VkDeviceSize,
     device_buffer: VkBuffer,
     device_memory: VkDeviceMemory,
     host_buffer: VkBuffer,
     host_memory: VkDeviceMemory,
+    command_pool: &'c CommandPool<'a, 'b>,
 }
 
-impl StagingBuffer {
-    pub fn new(device: &Device, command_pool: VkCommandPool) -> Self {
+impl<'a, 'b, 'c> StagingBuffer<'a, 'b, 'c> {
+    pub fn new(command_pool: &'c CommandPool<'a, 'b>) -> Self {
+        let device = command_pool.device();
         unsafe {
-            println!("device: {:?}, command pool: {:?}", device.handle(), command_pool);
+            println!("device: {:?}, command pool: {:?}", device.handle(), command_pool.handle());
             const BUFFER_ELEMENTS: usize = 32;
             let buffer_size = (BUFFER_ELEMENTS * mem::size_of::<u32>()) as VkDeviceSize;
             let mut input: Vec<u32> = Vec::with_capacity(BUFFER_ELEMENTS);
@@ -301,7 +313,7 @@ impl StagingBuffer {
                 buffer_size,
                 ptr::null_mut()).unwrap();
             // Copy to staging buffer
-            let allocate_info = VkCommandBufferAllocateInfo::new(command_pool, VkCommandBufferLevel::VK_COMMAND_BUFFER_LEVEL_PRIMARY, 1);
+            let allocate_info = VkCommandBufferAllocateInfo::new(command_pool.handle(), VkCommandBufferLevel::VK_COMMAND_BUFFER_LEVEL_PRIMARY, 1);
             let mut copy_command = MaybeUninit::<VkCommandBuffer>::zeroed();
             vkAllocateCommandBuffers(device.handle(), &allocate_info, copy_command.as_mut_ptr())
                 .into_result()
@@ -331,7 +343,7 @@ impl StagingBuffer {
                 .into_result()
                 .unwrap();
             vkDestroyFence(device.handle(), fence, ptr::null());
-            vkFreeCommandBuffers(device.handle(), command_pool, 1, &copy_command);
+            vkFreeCommandBuffers(device.handle(), command_pool.handle(), 1, &copy_command);
             StagingBuffer {
                 buffer_element_count: BUFFER_ELEMENTS,
                 buffer_size: buffer_size,
@@ -339,7 +351,12 @@ impl StagingBuffer {
                 device_memory: device_memory,
                 host_buffer: host_buffer,
                 host_memory: host_memory,
+                command_pool: command_pool,
             }
         }
+    }
+
+    pub fn command_pool(&self) -> &CommandPool {
+        self.command_pool
     }
 }
