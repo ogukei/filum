@@ -2,7 +2,7 @@
 use super::vk::*;
 use super::error::Result;
 use super::error::ErrorCode;
-use super::instance::{QueueFamily, PhysicalDevice};
+use super::instance::{Instance, QueueFamily, PhysicalDevice};
 
 use std::ptr;
 use std::mem;
@@ -12,13 +12,14 @@ use libc::{c_float, c_void};
 
 use std::io::Read;
 
-pub struct Device {
+pub struct Device<'a> {
     handle: VkDevice,
     queue: Queue,
-    physical_device_handle: VkPhysicalDevice,
+    physical_device: PhysicalDevice,
+    instance: &'a Instance,
 }
 
-impl Device {
+impl<'a> Device<'a> {
     #[inline]
     pub fn handle(&self) -> VkDevice {
         self.handle
@@ -27,6 +28,11 @@ impl Device {
     #[inline]
     pub fn queue(&self) -> &Queue {
         &self.queue
+    }
+
+    #[inline]
+    pub fn physical_device(&self) -> &PhysicalDevice {
+        &self.physical_device
     }
 
     pub fn create_command_pool(&self) -> Result<VkCommandPool> {
@@ -55,7 +61,7 @@ impl Device {
             let buffer = buffer.assume_init();
             // physical memory properties
             let mut memory_properties = MaybeUninit::<VkPhysicalDeviceMemoryProperties>::zeroed();
-            vkGetPhysicalDeviceMemoryProperties(self.physical_device_handle, memory_properties.as_mut_ptr());
+            vkGetPhysicalDeviceMemoryProperties(self.physical_device().handle(), memory_properties.as_mut_ptr());
             let memory_properties = memory_properties.assume_init();
             // requirements
             let mut requirements = MaybeUninit::<VkMemoryRequirements>::zeroed();
@@ -118,14 +124,17 @@ impl Queue {
     }
 }
 
-pub struct DeviceBuilder {
-
+pub struct DeviceBuilder<'a> {
+    instance: &'a Instance,
 }
 
-impl DeviceBuilder {
-    pub fn new() -> Self { DeviceBuilder {} }
+impl<'a> DeviceBuilder<'a> {
+    pub fn new(instance: &'a Instance) -> Self {
+        DeviceBuilder { instance }
+    }
 
-    pub fn build(self, devices: &Vec<PhysicalDevice>) -> Result<Device> {
+    pub fn build(self) -> Result<Device<'a>> {
+        let devices = self.instance.physical_devices()?;
         let device = devices.first()
             .ok_or_else(|| ErrorCode::SuitablePhysicalDeviceNotFound)?;
         let families = device.queue_families()?;
@@ -152,7 +161,8 @@ impl DeviceBuilder {
             Ok(Device {
                 handle: handle,
                 queue: Queue::new(queue.assume_init(), family),
-                physical_device_handle: device.handle(),
+                physical_device: *device,
+                instance: self.instance
             })
         }
     }

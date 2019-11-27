@@ -6,22 +6,10 @@ use super::dispatch::{StagingBuffer, ComputePipeline, CommandDispatch};
 
 pub fn initialize() {
     let instance = Instance::new().unwrap();
-    println!("{:?}", instance);
-
-    let devices = instance.physical_devices().unwrap();
-    println!("{:?}", devices);
-
-    let properties: Vec<_> = devices.iter()
-        .map(|v|v.properties())
-        .collect();
-
-    for property in properties {
-        println!("{:?}", property.device_name());
-    }
-
-    let device = DeviceBuilder::new()
-        .build(&devices)
+    let device = DeviceBuilder::new(&instance)
+        .build()
         .unwrap();
+    println!("{:?}", device.physical_device().properties().device_name());
 
     let command_pool = device.create_command_pool().unwrap();
     let staging_buffer = StagingBuffer::new(&device, command_pool);

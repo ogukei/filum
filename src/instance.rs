@@ -57,6 +57,7 @@ impl Instance {
 }
 
 #[derive(Debug)]
+#[derive(Copy, Clone)]
 pub struct PhysicalDevice {
     handle: VkPhysicalDevice,
 }
