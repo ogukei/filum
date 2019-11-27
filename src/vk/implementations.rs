@@ -5,6 +5,7 @@
 use crate::vk::*;
 
 use libc::{c_char, c_float, size_t, c_void};
+use std::ffi::{CStr, CString};
 use std::ptr;
 
 const VK_API_VERSION_1_1: u32 = 4198400;
@@ -439,4 +440,11 @@ impl VkBufferMemoryBarrier {
             size: size,
         }
     }
+}
+
+impl VkPhysicalDeviceProperties {
+    pub fn device_name(&self) -> CString {
+        unsafe { CStr::from_ptr(self.deviceName.as_ptr()) }
+            .to_owned()
+    } 
 }
