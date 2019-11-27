@@ -34,28 +34,41 @@ impl<'a> Device<'a> {
     pub fn physical_device(&self) -> &PhysicalDevice {
         &self.physical_device
     }
+}
 
-    pub fn create_buffer(
-        &self,
+impl<'a> Drop for Device<'a> {
+    fn drop(&mut self) {
+        println!("Drop Device")
+    }
+}
+
+pub struct BufferMemory<'a, 'b: 'a> {
+    buffer: VkBuffer,
+    memory: VkDeviceMemory,
+    device: &'b Device<'a>
+}
+
+impl<'a, 'b> BufferMemory<'a, 'b> {
+    pub fn new(device: &'b Device<'a>, 
         usage: VkBufferUsageFlags, 
         memory_property_flags: VkMemoryPropertyFlags, 
         size: VkDeviceSize,
-        data: *mut c_void) -> Result<(VkBuffer, VkDeviceMemory)> {
+        data: *mut c_void) -> Result<Self> {
         unsafe {
             // creates buffer
             let mut buffer = MaybeUninit::<VkBuffer>::zeroed();
             let buffer_create_info = VkBufferCreateInfo::new(size, usage, VkSharingMode::VK_SHARING_MODE_EXCLUSIVE);
-            vkCreateBuffer(self.handle, &buffer_create_info, ptr::null(), buffer.as_mut_ptr())
+            vkCreateBuffer(device.handle(), &buffer_create_info, ptr::null(), buffer.as_mut_ptr())
                 .into_result()
                 .unwrap();
             let buffer = buffer.assume_init();
             // physical memory properties
             let mut memory_properties = MaybeUninit::<VkPhysicalDeviceMemoryProperties>::zeroed();
-            vkGetPhysicalDeviceMemoryProperties(self.physical_device().handle(), memory_properties.as_mut_ptr());
+            vkGetPhysicalDeviceMemoryProperties(device.physical_device().handle(), memory_properties.as_mut_ptr());
             let memory_properties = memory_properties.assume_init();
             // requirements
             let mut requirements = MaybeUninit::<VkMemoryRequirements>::zeroed();
-            vkGetBufferMemoryRequirements(self.handle, buffer, requirements.as_mut_ptr());
+            vkGetBufferMemoryRequirements(device.handle(), buffer, requirements.as_mut_ptr());
             let requirements = requirements.assume_init();
             // find a memory type index that fits the properties
             let memory_type_bits = requirements.memoryTypeBits;
@@ -70,32 +83,40 @@ impl<'a> Device<'a> {
             // allocation
             let mut memory = MaybeUninit::<VkDeviceMemory>::zeroed();
             let allocate_info = VkMemoryAllocateInfo::new(requirements.size, memory_type_index);
-            vkAllocateMemory(self.handle, &allocate_info, ptr::null(), memory.as_mut_ptr())
+            vkAllocateMemory(device.handle(), &allocate_info, ptr::null(), memory.as_mut_ptr())
                 .into_result()
                 .unwrap();
             let memory = memory.assume_init();
             // maps memory if needed
             if data != ptr::null_mut() {
                 let mut mapped = MaybeUninit::<*mut c_void>::zeroed();
-                vkMapMemory(self.handle, memory, 0, size, 0, mapped.as_mut_ptr())
+                vkMapMemory(device.handle(), memory, 0, size, 0, mapped.as_mut_ptr())
                     .into_result()
                     .unwrap();
                 let mapped = mapped.assume_init();
                 ptr::copy_nonoverlapping(data as *mut u8, mapped as *mut u8, size as usize);
-                vkUnmapMemory(self.handle, memory);
+                vkUnmapMemory(device.handle(), memory);
             }
             // binding
-            vkBindBufferMemory(self.handle, buffer, memory, 0)
+            vkBindBufferMemory(device.handle(), buffer, memory, 0)
                 .into_result()
                 .unwrap();
-            Ok((buffer, memory))
+            Ok(BufferMemory { 
+                buffer: buffer,
+                memory: memory,
+                device: device,
+            })
         }
     }
-}
 
-impl<'a> Drop for Device<'a> {
-    fn drop(&mut self) {
-        println!("Drop Device")
+    #[inline]
+    pub fn buffer(&self) -> VkBuffer {
+        self.buffer
+    }
+
+    #[inline]
+    pub fn memory(&self) -> VkDeviceMemory {
+        self.memory
     }
 }
 
