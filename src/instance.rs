@@ -44,7 +44,7 @@ impl Instance {
             vkEnumeratePhysicalDevices(self.handle, count.as_mut_ptr(), devices.as_mut_ptr())
                 .into_result()?;
             let devices: Vec<PhysicalDevice> = devices.into_iter()
-                .map(|e| PhysicalDevice::new(e))
+                .map(|v| PhysicalDevice::new(v, self))
                 .collect();
             Ok(devices)
         }
@@ -57,14 +57,14 @@ impl Instance {
 }
 
 #[derive(Debug)]
-#[derive(Copy, Clone)]
-pub struct PhysicalDevice {
+pub struct PhysicalDevice<'a> {
     handle: VkPhysicalDevice,
+    instance: &'a Instance,
 }
 
-impl PhysicalDevice {
-    pub fn new(device: VkPhysicalDevice) -> Self {
-        PhysicalDevice { handle: device }
+impl<'a> PhysicalDevice<'a> {
+    pub fn new(device: VkPhysicalDevice, instance: &'a Instance) -> Self {
+        PhysicalDevice { handle: device, instance: instance }
     }
 
     #[inline]

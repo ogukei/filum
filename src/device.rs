@@ -15,7 +15,7 @@ use std::io::Read;
 pub struct Device<'a> {
     handle: VkDevice,
     queue: Queue,
-    physical_device: PhysicalDevice,
+    physical_device: PhysicalDevice<'a>,
     instance: &'a Instance,
 }
 
@@ -33,16 +33,6 @@ impl<'a> Device<'a> {
     #[inline]
     pub fn physical_device(&self) -> &PhysicalDevice {
         &self.physical_device
-    }
-
-    pub fn create_command_pool(&self) -> Result<VkCommandPool> {
-        unsafe {
-            let mut pool = MaybeUninit::<VkCommandPool>::zeroed();
-            let info = VkCommandPoolCreateInfo::new(self.queue.family.index() as u32);
-            vkCreateCommandPool(self.handle, &info, ptr::null(), pool.as_mut_ptr())
-                .into_result()?;
-            Ok(pool.assume_init())
-        }
     }
 
     pub fn create_buffer(
@@ -103,13 +93,39 @@ impl<'a> Device<'a> {
     }
 }
 
+pub struct CommandPool<'a, 'b> {
+    handle: VkCommandPool,
+    device: &'b Device<'a>,
+}
+
+impl<'a, 'b> CommandPool<'a, 'b> {
+    pub fn new(device: &'b Device<'a>) -> Result<Self> {
+        unsafe {
+            let mut handle = MaybeUninit::<VkCommandPool>::zeroed();
+            let info = VkCommandPoolCreateInfo::new(device.queue().family().index() as u32);
+            vkCreateCommandPool(device.handle, &info, ptr::null(), handle.as_mut_ptr())
+                .into_result()?;
+            let handle = handle.assume_init();
+            Ok(CommandPool {
+                handle: handle,
+                device: device,
+            })
+        }
+    }
+
+    #[inline]
+    pub fn handle(&self) -> VkCommandPool {
+        self.handle
+    }
+}
+
 pub struct Queue {
     handle: VkQueue,
     family: QueueFamily,
 }
 
 impl Queue {
-    pub fn new(handle: VkQueue, family: QueueFamily) -> Self {
+    fn new(handle: VkQueue, family: QueueFamily) -> Self {
         Queue { handle: handle, family: family }
     }
 
@@ -133,9 +149,10 @@ impl<'a> DeviceBuilder<'a> {
         DeviceBuilder { instance }
     }
 
-    pub fn build(self) -> Result<Device<'a>> {
+    pub fn into_device(self) -> Result<Device<'a>> {
         let devices = self.instance.physical_devices()?;
-        let device = devices.first()
+        let device = devices.into_iter()
+            .nth(0)
             .ok_or_else(|| ErrorCode::SuitablePhysicalDeviceNotFound)?;
         let families = device.queue_families()?;
         // iterate through compute family candidates keeping the indices
@@ -158,11 +175,12 @@ impl<'a> DeviceBuilder<'a> {
             // queues
             let mut queue = MaybeUninit::<VkQueue>::zeroed();
             vkGetDeviceQueue(handle, family_index, 0, queue.as_mut_ptr());
+            let queue = Queue::new(queue.assume_init(), family);
             Ok(Device {
                 handle: handle,
-                queue: Queue::new(queue.assume_init(), family),
-                physical_device: *device,
-                instance: self.instance
+                queue: queue,
+                physical_device: device,
+                instance: self.instance,
             })
         }
     }
