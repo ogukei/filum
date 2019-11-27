@@ -3,7 +3,7 @@
 use crate::vk::*;
 use crate::error::Result;
 use crate::error::ErrorCode;
-use super::device::{Device, ShaderModule, CommandPool};
+use super::device::{Device, ShaderModule, CommandPool, BufferMemory};
 
 use std::ptr;
 use std::mem;
@@ -32,7 +32,7 @@ impl CommandDispatch {
                 let buffer_barrier = VkBufferMemoryBarrier::new(
                     VkAccessFlagBits::VK_ACCESS_HOST_WRITE_BIT as VkFlags,
                     VkAccessFlagBits::VK_ACCESS_SHADER_READ_BIT as VkFlags,
-                    staging_buffer.device_buffer,
+                    staging_buffer.device_buffer_memory().buffer(),
                     VK_WHOLE_SIZE,
                 );
                 vkCmdPipelineBarrier(
@@ -65,7 +65,7 @@ impl CommandDispatch {
                 let buffer_barrier = VkBufferMemoryBarrier::new(
                     VkAccessFlagBits::VK_ACCESS_SHADER_WRITE_BIT as VkFlags,
                     VkAccessFlagBits::VK_ACCESS_TRANSFER_READ_BIT as VkFlags,
-                    staging_buffer.device_buffer,
+                    staging_buffer.device_buffer_memory().buffer(),
                     VK_WHOLE_SIZE,
                 );
                 vkCmdPipelineBarrier(
@@ -82,8 +82,8 @@ impl CommandDispatch {
             let copy_region = VkBufferCopy::new(staging_buffer.buffer_size);
             vkCmdCopyBuffer(
                 command_buffer, 
-                staging_buffer.device_buffer,
-                staging_buffer.host_buffer,
+                staging_buffer.device_buffer_memory().buffer(),
+                staging_buffer.host_buffer_memory().buffer(),
                 1,
                 &copy_region);
             // Barrier to ensure that buffer copy is finished before host reading from it
@@ -91,7 +91,7 @@ impl CommandDispatch {
                 let buffer_barrier = VkBufferMemoryBarrier::new(
                     VkAccessFlagBits::VK_ACCESS_TRANSFER_WRITE_BIT as VkFlags,
                     VkAccessFlagBits::VK_ACCESS_HOST_READ_BIT as VkFlags,
-                    staging_buffer.host_buffer,
+                    staging_buffer.host_buffer_memory().buffer(),
                     VK_WHOLE_SIZE,
                 );
                 vkCmdPipelineBarrier(
@@ -118,16 +118,16 @@ impl CommandDispatch {
                 .unwrap();
             // Make device writes visible to the host
             let mut mapped = MaybeUninit::<*mut c_void>::zeroed();
-            vkMapMemory(device.handle(), staging_buffer.host_memory, 0, VK_WHOLE_SIZE, 0, mapped.as_mut_ptr());
+            vkMapMemory(device.handle(), staging_buffer.host_buffer_memory().memory(), 0, VK_WHOLE_SIZE, 0, mapped.as_mut_ptr());
             let mapped = mapped.assume_init();
-            let mapped_range = VkMappedMemoryRange::new(staging_buffer.host_memory, 0, VK_WHOLE_SIZE);
+            let mapped_range = VkMappedMemoryRange::new(staging_buffer.host_buffer_memory().memory(), 0, VK_WHOLE_SIZE);
             vkInvalidateMappedMemoryRanges(device.handle(), 1, &mapped_range);
             let mut output: Vec<u32> = Vec::with_capacity(staging_buffer.buffer_element_count);
             {
                 output.resize(staging_buffer.buffer_element_count, 0);
                 ptr::copy_nonoverlapping(mapped, output.as_mut_ptr() as *mut c_void, staging_buffer.buffer_size as usize);
             }
-            vkUnmapMemory(device.handle(), staging_buffer.host_memory);
+            vkUnmapMemory(device.handle(), staging_buffer.host_buffer_memory().memory());
             // compute work done
             vkQueueWaitIdle(device.queue().handle());
             CommandDispatch { output: output }
@@ -189,7 +189,7 @@ impl<'a, 'b, 'c, 'd> ComputePipeline<'a, 'b, 'c, 'd> {
             }
             let descriptor_set = descriptor_set.assume_init();
             {
-                let buffer_info = VkDescriptorBufferInfo::new(staging_buffer.device_buffer, 0, VK_WHOLE_SIZE);
+                let buffer_info = VkDescriptorBufferInfo::new(staging_buffer.device_buffer_memory().buffer(), 0, VK_WHOLE_SIZE);
                 let write_set = VkWriteDescriptorSet::new(descriptor_set, VkDescriptorType::VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 0, &buffer_info);
                 vkUpdateDescriptorSets(device.handle(), 1, &write_set, 0, ptr::null());
             }
@@ -273,10 +273,8 @@ impl<'a, 'b, 'c, 'd> Drop for ComputePipeline<'a, 'b, 'c, 'd> {
 pub struct StagingBuffer<'a, 'b: 'a, 'c: 'b> {
     buffer_element_count: usize,
     buffer_size: VkDeviceSize,
-    device_buffer: VkBuffer,
-    device_memory: VkDeviceMemory,
-    host_buffer: VkBuffer,
-    host_memory: VkDeviceMemory,
+    device_buffer_memory: BufferMemory<'a, 'b>,
+    host_buffer_memory: BufferMemory<'a, 'b>,
     command_pool: &'c CommandPool<'a, 'b>,
 }
 
@@ -293,25 +291,26 @@ impl<'a, 'b, 'c> StagingBuffer<'a, 'b, 'c> {
                 *v = i as u32
             }
             // host buffer
-            let (host_buffer, host_memory) = device.create_buffer(
+            let host_buffer_memory = BufferMemory::new(
+                device,
                 VkBufferUsageFlagBits::VK_BUFFER_USAGE_TRANSFER_SRC_BIT as u32 | 
                     VkBufferUsageFlagBits::VK_BUFFER_USAGE_TRANSFER_DST_BIT as u32, 
                 VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT as u32,
                 buffer_size,
                 input.as_mut_ptr() as *mut c_void).unwrap();
-            println!("buffer: {:?}", host_buffer);
             // Flush writes to host visible buffer
             let mut mapped = MaybeUninit::<*mut c_void>::zeroed();
-            vkMapMemory(device.handle(), host_memory, 0, VK_WHOLE_SIZE, 0, mapped.as_mut_ptr())
+            vkMapMemory(device.handle(), host_buffer_memory.memory(), 0, VK_WHOLE_SIZE, 0, mapped.as_mut_ptr())
                 .into_result()
                 .unwrap();
-            let mapped_memory_range = VkMappedMemoryRange::new(host_memory, 0, VK_WHOLE_SIZE);
+            let mapped_memory_range = VkMappedMemoryRange::new(host_buffer_memory.memory(), 0, VK_WHOLE_SIZE);
             vkFlushMappedMemoryRanges(device.handle(), 1, &mapped_memory_range)
                 .into_result()
                 .unwrap();
-            vkUnmapMemory(device.handle(), host_memory);
+            vkUnmapMemory(device.handle(), host_buffer_memory.memory());
             // device buffer
-            let (device_buffer, device_memory) = device.create_buffer(
+            let device_buffer_memory = BufferMemory::new(
+                device,
                 VkBufferUsageFlagBits::VK_BUFFER_USAGE_TRANSFER_SRC_BIT as u32 | 
                     VkBufferUsageFlagBits::VK_BUFFER_USAGE_TRANSFER_DST_BIT as u32 |
                     VkBufferUsageFlagBits::VK_BUFFER_USAGE_STORAGE_BUFFER_BIT as u32,
@@ -330,7 +329,7 @@ impl<'a, 'b, 'c> StagingBuffer<'a, 'b, 'c> {
                 .into_result()
                 .unwrap();
             let copy_region = VkBufferCopy::new(buffer_size);
-            vkCmdCopyBuffer(copy_command, host_buffer, device_buffer, 1, &copy_region);
+            vkCmdCopyBuffer(copy_command, host_buffer_memory.buffer(), device_buffer_memory.buffer(), 1, &copy_region);
             vkEndCommandBuffer(copy_command)
                 .into_result()
                 .unwrap();
@@ -353,17 +352,27 @@ impl<'a, 'b, 'c> StagingBuffer<'a, 'b, 'c> {
             StagingBuffer {
                 buffer_element_count: BUFFER_ELEMENTS,
                 buffer_size: buffer_size,
-                device_buffer: device_buffer,
-                device_memory: device_memory,
-                host_buffer: host_buffer,
-                host_memory: host_memory,
+                device_buffer_memory: device_buffer_memory,
+                host_buffer_memory: host_buffer_memory,
                 command_pool: command_pool,
             }
         }
     }
 
+
+    #[inline]
     pub fn command_pool(&self) -> &CommandPool {
         self.command_pool
+    }
+
+    #[inline]
+    pub fn host_buffer_memory(&self) -> &BufferMemory {
+        &self.host_buffer_memory
+    }
+
+    #[inline]
+    pub fn device_buffer_memory(&self) -> &BufferMemory {
+        &self.device_buffer_memory
     }
 }
 
