@@ -1366,4 +1366,9 @@ extern "C" {
         device: VkDevice,
         pAllocator: *const VkAllocationCallbacks,
     );
+    // @see https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/vkDestroyInstance.html
+    pub fn vkDestroyInstance(
+        instance: VkInstance,
+        pAllocator: *const VkAllocationCallbacks,
+    );
 }
