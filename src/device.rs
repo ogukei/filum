@@ -165,7 +165,11 @@ impl<'a, 'b> CommandPool<'a, 'b> {
 
 impl<'a, 'b> Drop for CommandPool<'a, 'b> {
     fn drop(&mut self) {
-        println!("Drop CommandPool")
+        println!("Drop CommandPool");
+        unsafe {
+            vkDestroyCommandPool(self.device.handle(), self.handle, ptr::null());
+            self.handle = ptr::null_mut();
+        }
     }
 }
 

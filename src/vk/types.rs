@@ -1349,4 +1349,10 @@ extern "C" {
         memory: VkDeviceMemory,
         pAllocator: *const VkAllocationCallbacks,
     );
+    // @see https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/vkDestroyCommandPool.html
+    pub fn vkDestroyCommandPool(
+        device: VkDevice,
+        commandPool: VkCommandPool,
+        pAllocator: *const VkAllocationCallbacks,
+    );
 }

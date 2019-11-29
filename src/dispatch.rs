@@ -365,7 +365,6 @@ impl<'a, 'b, 'c> StagingBuffer<'a, 'b, 'c> {
         }
     }
 
-
     #[inline]
     pub fn command_pool(&self) -> &CommandPool {
         self.command_pool
