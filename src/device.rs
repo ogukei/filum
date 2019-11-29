@@ -120,6 +120,18 @@ impl<'a, 'b> BufferMemory<'a, 'b> {
     }
 }
 
+impl<'a, 'b> Drop for BufferMemory<'a, 'b> {
+    fn drop(&mut self) {
+        unsafe {
+            println!("Drop BufferMemory");
+            vkDestroyBuffer(self.device.handle(), self.buffer, ptr::null());
+            self.buffer = ptr::null_mut();
+            vkFreeMemory(self.device.handle(), self.memory, ptr::null());
+            self.memory = ptr::null_mut();
+        }
+    }
+}
+
 pub struct CommandPool<'a, 'b: 'a> {
     handle: VkCommandPool,
     device: &'b Device<'a>,

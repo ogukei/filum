@@ -1337,4 +1337,16 @@ extern "C" {
     pub fn vkQueueWaitIdle(
         queue: VkQueue,
     ) -> VkResult;
+    // @see https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/vkDestroyBuffer.html
+    pub fn vkDestroyBuffer(
+        device: VkDevice,
+        buffer: VkBuffer,
+        pAllocator: *const VkAllocationCallbacks,
+    );
+    // @see https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/vkFreeMemory.html
+    pub fn vkFreeMemory(
+        device: VkDevice,
+        memory: VkDeviceMemory,
+        pAllocator: *const VkAllocationCallbacks,
+    );
 }
