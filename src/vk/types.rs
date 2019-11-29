@@ -1371,4 +1371,34 @@ extern "C" {
         instance: VkInstance,
         pAllocator: *const VkAllocationCallbacks,
     );
+    // @see https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/vkDestroyPipelineLayout.html
+    pub fn vkDestroyPipelineLayout(
+        device: VkDevice,
+        pipelineLayout: VkPipelineLayout,
+        pAllocator: *const VkAllocationCallbacks,
+    );
+    // @see https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/vkDestroyDescriptorSetLayout.html
+    pub fn vkDestroyDescriptorSetLayout(
+        device: VkDevice,
+        descriptorSetLayout: VkDescriptorSetLayout,
+        pAllocator: *const VkAllocationCallbacks,
+    );
+    // @see https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/vkDestroyDescriptorPool.html
+    pub fn vkDestroyDescriptorPool(
+        device: VkDevice,
+        descriptorPool: VkDescriptorPool,
+        pAllocator: *const VkAllocationCallbacks,
+    );
+    // @see https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/vkDestroyPipeline.html
+    pub fn vkDestroyPipeline(
+        device: VkDevice,
+        pipeline: VkPipeline,
+        pAllocator: *const VkAllocationCallbacks,
+    );
+    // @see https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/vkDestroyPipelineCache.html
+    pub fn vkDestroyPipelineCache(
+        device: VkDevice,
+        pipelineCache: VkPipelineCache,
+        pAllocator: *const VkAllocationCallbacks,
+    );
 }
