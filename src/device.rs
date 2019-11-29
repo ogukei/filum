@@ -38,7 +38,11 @@ impl<'a> Device<'a> {
 
 impl<'a> Drop for Device<'a> {
     fn drop(&mut self) {
-        println!("Drop Device")
+        println!("Drop Device");
+        unsafe {
+            vkDestroyDevice(self.handle, ptr::null());
+            self.handle = ptr::null_mut();
+        }
     }
 }
 
@@ -120,6 +124,18 @@ impl<'a, 'b> BufferMemory<'a, 'b> {
     }
 }
 
+impl<'a, 'b> Drop for BufferMemory<'a, 'b> {
+    fn drop(&mut self) {
+        unsafe {
+            println!("Drop BufferMemory");
+            vkDestroyBuffer(self.device.handle(), self.buffer, ptr::null());
+            self.buffer = ptr::null_mut();
+            vkFreeMemory(self.device.handle(), self.memory, ptr::null());
+            self.memory = ptr::null_mut();
+        }
+    }
+}
+
 pub struct CommandPool<'a, 'b: 'a> {
     handle: VkCommandPool,
     device: &'b Device<'a>,
@@ -153,7 +169,11 @@ impl<'a, 'b> CommandPool<'a, 'b> {
 
 impl<'a, 'b> Drop for CommandPool<'a, 'b> {
     fn drop(&mut self) {
-        println!("Drop CommandPool")
+        println!("Drop CommandPool");
+        unsafe {
+            vkDestroyCommandPool(self.device.handle(), self.handle, ptr::null());
+            self.handle = ptr::null_mut();
+        }
     }
 }
 
@@ -187,7 +207,7 @@ impl<'a> DeviceBuilder<'a> {
         DeviceBuilder { instance }
     }
 
-    pub fn into_device(self) -> Result<Device<'a>> {
+    pub fn build(self) -> Result<Device<'a>> {
         let devices = self.instance.physical_devices()?;
         let device = devices.into_iter()
             .nth(0)
@@ -258,6 +278,10 @@ impl<'a, 'b> ShaderModule<'a, 'b> {
 
 impl<'a, 'b> Drop for ShaderModule<'a, 'b> {
     fn drop(&mut self) {
-        println!("Drop ShaderModule")
+        println!("Drop ShaderModule");
+        unsafe {
+            vkDestroyShaderModule(self.device.handle(), self.handle, ptr::null());
+            self.handle = ptr::null_mut();
+        }
     }
 }
