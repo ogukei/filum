@@ -1355,4 +1355,10 @@ extern "C" {
         commandPool: VkCommandPool,
         pAllocator: *const VkAllocationCallbacks,
     );
+    // @see https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/vkDestroyShaderModule.html
+    pub fn vkDestroyShaderModule(
+        device: VkDevice,
+        shaderModule: VkShaderModule,
+        pAllocator: *const VkAllocationCallbacks,
+    );
 }

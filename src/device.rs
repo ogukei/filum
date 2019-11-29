@@ -274,6 +274,10 @@ impl<'a, 'b> ShaderModule<'a, 'b> {
 
 impl<'a, 'b> Drop for ShaderModule<'a, 'b> {
     fn drop(&mut self) {
-        println!("Drop ShaderModule")
+        println!("Drop ShaderModule");
+        unsafe {
+            vkDestroyShaderModule(self.device.handle(), self.handle, ptr::null());
+            self.handle = ptr::null_mut();
+        }
     }
 }
