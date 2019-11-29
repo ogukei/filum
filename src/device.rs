@@ -187,7 +187,7 @@ impl<'a> DeviceBuilder<'a> {
         DeviceBuilder { instance }
     }
 
-    pub fn into_device(self) -> Result<Device<'a>> {
+    pub fn build(self) -> Result<Device<'a>> {
         let devices = self.instance.physical_devices()?;
         let device = devices.into_iter()
             .nth(0)

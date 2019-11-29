@@ -135,18 +135,26 @@ impl CommandDispatch {
     }
 }
 
-pub struct ComputePipeline<'a, 'b: 'a, 'c: 'b, 'd: 'c> {
+pub struct ComputePipeline<
+    'instance,
+    'device: 'instance,
+    'command: 'device,
+    'staging: 'command,
+    'shader: 'device> {
     handle: VkPipeline,
     layout: VkPipelineLayout,
     descriptor_set: VkDescriptorSet,
     command_buffer: VkCommandBuffer,
     fence: VkFence,
-    shader_module: ShaderModule<'a, 'b>,
-    staging_buffer: &'d StagingBuffer<'a, 'b, 'c>,
+    staging_buffer: &'staging StagingBuffer<'instance, 'device, 'command>,
+    shader_module: &'shader ShaderModule<'instance, 'device>,
 }
 
-impl<'a, 'b, 'c, 'd> ComputePipeline<'a, 'b, 'c, 'd> {
-    pub fn new(staging_buffer: &'d StagingBuffer<'a, 'b, 'c>) -> Self {
+impl<'instance, 'device, 'command, 'staging, 'shader>
+ComputePipeline<'instance, 'device, 'command, 'staging, 'shader> {
+    pub fn new(
+        staging_buffer: &'staging StagingBuffer<'instance, 'device, 'command>,
+        shader_module: &'shader ShaderModule<'instance, 'device>) -> Self {
         let command_pool = staging_buffer.command_pool();
         let device = command_pool.device();
         unsafe {
@@ -203,8 +211,6 @@ impl<'a, 'b, 'c, 'd> ComputePipeline<'a, 'b, 'c, 'd> {
             }
             let pipeline_cache = pipeline_cache.assume_init();
             let mut compute_pipeline = MaybeUninit::<VkPipeline>::zeroed();
-            let shader_module = ShaderModule::new(device)
-                .unwrap();
             {
                 #[repr(C)]
                 struct SpecializationData {
@@ -264,7 +270,7 @@ impl<'a, 'b, 'c, 'd> ComputePipeline<'a, 'b, 'c, 'd> {
     }
 }
 
-impl<'a, 'b, 'c, 'd> Drop for ComputePipeline<'a, 'b, 'c, 'd> {
+impl<'instance, 'device, 'command, 'staging, 'shader> Drop for ComputePipeline<'instance, 'device, 'command, 'staging, 'shader> {
     fn drop(&mut self) {
         println!("Drop ComputePipeline")
     }
