@@ -1361,4 +1361,9 @@ extern "C" {
         shaderModule: VkShaderModule,
         pAllocator: *const VkAllocationCallbacks,
     );
+    // @see https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/vkDestroyDevice.html
+    pub fn vkDestroyDevice(
+        device: VkDevice,
+        pAllocator: *const VkAllocationCallbacks,
+    );
 }

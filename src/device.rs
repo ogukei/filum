@@ -38,7 +38,11 @@ impl<'a> Device<'a> {
 
 impl<'a> Drop for Device<'a> {
     fn drop(&mut self) {
-        println!("Drop Device")
+        println!("Drop Device");
+        unsafe {
+            vkDestroyDevice(self.handle, ptr::null());
+            self.handle = ptr::null_mut();
+        }
     }
 }
 
