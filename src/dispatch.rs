@@ -10,7 +10,7 @@ use std::mem;
 use std::ffi::{CStr, CString};
 use std::mem::MaybeUninit;
 use libc::{c_float, c_void};
-
+use std::sync::Arc;
 use std::io::Read;
 
 pub struct CommandDispatch {
@@ -18,7 +18,7 @@ pub struct CommandDispatch {
 }
 
 impl CommandDispatch {
-    pub fn new(pipeline: &ComputePipeline) -> Self {
+    pub fn new(pipeline: &Arc<ComputePipeline>) -> Arc<Self> {
         let staging_buffer = pipeline.staging_buffer();
         let device = staging_buffer.command_pool().device();
         unsafe {
@@ -130,17 +130,13 @@ impl CommandDispatch {
             vkUnmapMemory(device.handle(), staging_buffer.host_buffer_memory().memory());
             // compute work done
             vkQueueWaitIdle(device.queue().handle());
-            CommandDispatch { output: output }
+            let command_dispatch = CommandDispatch { output: output };
+            Arc::new(command_dispatch)
         }
     }
 }
 
-pub struct ComputePipeline<
-    'instance,
-    'device: 'instance,
-    'command: 'device,
-    'staging: 'command,
-    'shader: 'device> {
+pub struct ComputePipeline {
     handle: VkPipeline,
     cache: VkPipelineCache,
     layout: VkPipelineLayout,
@@ -149,15 +145,12 @@ pub struct ComputePipeline<
     descriptor_set: VkDescriptorSet,
     command_buffer: VkCommandBuffer,
     fence: VkFence,
-    staging_buffer: &'staging StagingBuffer<'instance, 'device, 'command>,
-    shader_module: &'shader ShaderModule<'instance, 'device>,
+    staging_buffer: Arc<StagingBuffer>,
+    shader_module: Arc<ShaderModule>,
 }
 
-impl<'instance, 'device, 'command, 'staging, 'shader>
-ComputePipeline<'instance, 'device, 'command, 'staging, 'shader> {
-    pub fn new(
-        staging_buffer: &'staging StagingBuffer<'instance, 'device, 'command>,
-        shader_module: &'shader ShaderModule<'instance, 'device>) -> Self {
+impl ComputePipeline {
+    pub fn new(staging_buffer: &Arc<StagingBuffer>, shader_module: &Arc<ShaderModule>) -> Arc<Self> {
         let command_pool = staging_buffer.command_pool();
         let device = command_pool.device();
         unsafe {
@@ -256,27 +249,28 @@ ComputePipeline<'instance, 'device, 'command, 'staging, 'shader> {
                     .unwrap();
             }
             let fence = fence.assume_init();
-            ComputePipeline {
+            let compute_pipeline = ComputePipeline {
                 handle: compute_pipeline,
                 cache: pipeline_cache,
                 layout: pipeline_layout,
                 descriptor_pool: descriptor_pool,
                 descriptor_set_layout: descriptor_set_layout,
                 descriptor_set: descriptor_set,
-                shader_module: shader_module,
                 command_buffer: command_buffer,
                 fence: fence,
-                staging_buffer: staging_buffer,
-            }
+                shader_module: Arc::clone(shader_module),
+                staging_buffer: Arc::clone(staging_buffer),
+            };
+            Arc::new(compute_pipeline)
         }
     }
 
-    pub fn staging_buffer(&self) -> &StagingBuffer {
-        self.staging_buffer
+    pub fn staging_buffer(&self) -> &Arc<StagingBuffer> {
+        &self.staging_buffer
     }
 }
 
-impl<'instance, 'device, 'command, 'staging, 'shader> Drop for ComputePipeline<'instance, 'device, 'command, 'staging, 'shader> {
+impl Drop for ComputePipeline {
     fn drop(&mut self) {
         println!("Drop ComputePipeline");
         unsafe {
@@ -300,18 +294,18 @@ impl<'instance, 'device, 'command, 'staging, 'shader> Drop for ComputePipeline<'
     }
 }
 
-pub struct StagingBuffer<'a, 'b: 'a, 'c: 'b> {
+pub struct StagingBuffer {
     buffer_element_count: usize,
     buffer_size: VkDeviceSize,
-    device_buffer_memory: BufferMemory<'a, 'b>,
-    host_buffer_memory: BufferMemory<'a, 'b>,
-    command_pool: &'c CommandPool<'a, 'b>,
+    device_buffer_memory: Arc<BufferMemory>,
+    host_buffer_memory: Arc<BufferMemory>,
+    command_pool: Arc<CommandPool>,
 }
 
-impl<'a, 'b, 'c> StagingBuffer<'a, 'b, 'c> {
-    pub fn new(command_pool: &'c CommandPool<'a, 'b>) -> Self {
-        let device = command_pool.device();
+impl StagingBuffer {
+    pub fn new(command_pool: &Arc<CommandPool>) -> Arc<Self> {
         unsafe {
+            let device = command_pool.device();
             println!("device: {:?}, command pool: {:?}", device.handle(), command_pool.handle());
             const BUFFER_ELEMENTS: usize = 32;
             let buffer_size = (BUFFER_ELEMENTS * mem::size_of::<u32>()) as VkDeviceSize;
@@ -379,33 +373,34 @@ impl<'a, 'b, 'c> StagingBuffer<'a, 'b, 'c> {
                 .unwrap();
             vkDestroyFence(device.handle(), fence, ptr::null());
             vkFreeCommandBuffers(device.handle(), command_pool.handle(), 1, &copy_command);
-            StagingBuffer {
+            let staging_buffer = StagingBuffer {
                 buffer_element_count: BUFFER_ELEMENTS,
                 buffer_size: buffer_size,
                 device_buffer_memory: device_buffer_memory,
                 host_buffer_memory: host_buffer_memory,
-                command_pool: command_pool,
-            }
+                command_pool: Arc::clone(command_pool),
+            };
+            Arc::new(staging_buffer)
         }
     }
 
     #[inline]
-    pub fn command_pool(&self) -> &CommandPool {
-        self.command_pool
+    pub fn command_pool(&self) -> &Arc<CommandPool> {
+        &self.command_pool
     }
 
     #[inline]
-    pub fn host_buffer_memory(&self) -> &BufferMemory {
+    pub fn host_buffer_memory(&self) -> &Arc<BufferMemory> {
         &self.host_buffer_memory
     }
 
     #[inline]
-    pub fn device_buffer_memory(&self) -> &BufferMemory {
+    pub fn device_buffer_memory(&self) -> &Arc<BufferMemory> {
         &self.device_buffer_memory
     }
 }
 
-impl<'a, 'b, 'c> Drop for StagingBuffer<'a, 'b, 'c> {
+impl Drop for StagingBuffer {
     fn drop(&mut self) {
         println!("Drop StagingBuffer")
     }
