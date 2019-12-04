@@ -2,24 +2,23 @@
 use super::vk::*;
 use super::error::Result;
 use super::error::ErrorCode;
-use super::instance::{Instance, QueueFamily, PhysicalDevice};
+use super::instance::{Instance, QueueFamily, PhysicalDevice, PhysicalDevicesBuilder};
 
 use std::ptr;
 use std::mem;
 use std::ffi::{CStr, CString};
 use std::mem::MaybeUninit;
 use libc::{c_float, c_void};
-
+use std::sync::Arc;
 use std::io::Read;
 
-pub struct Device<'a> {
+pub struct Device {
     handle: VkDevice,
     queue: Queue,
-    physical_device: PhysicalDevice<'a>,
-    instance: &'a Instance,
+    physical_device: Arc<PhysicalDevice>,
 }
 
-impl<'a> Device<'a> {
+impl Device {
     #[inline]
     pub fn handle(&self) -> VkDevice {
         self.handle
@@ -31,12 +30,12 @@ impl<'a> Device<'a> {
     }
 
     #[inline]
-    pub fn physical_device(&self) -> &PhysicalDevice {
+    pub fn physical_device(&self) -> &Arc<PhysicalDevice> {
         &self.physical_device
     }
 }
 
-impl<'a> Drop for Device<'a> {
+impl Drop for Device {
     fn drop(&mut self) {
         println!("Drop Device");
         unsafe {
@@ -46,18 +45,18 @@ impl<'a> Drop for Device<'a> {
     }
 }
 
-pub struct BufferMemory<'a, 'b: 'a> {
+pub struct BufferMemory {
     buffer: VkBuffer,
     memory: VkDeviceMemory,
-    device: &'b Device<'a>
+    device: Arc<Device>,
 }
 
-impl<'a, 'b> BufferMemory<'a, 'b> {
-    pub fn new(device: &'b Device<'a>, 
+impl BufferMemory {
+    pub fn new(device: &Arc<Device>, 
         usage: VkBufferUsageFlags, 
         memory_property_flags: VkMemoryPropertyFlags, 
         size: VkDeviceSize,
-        data: *mut c_void) -> Result<Self> {
+        data: *mut c_void) -> Result<Arc<Self>> {
         unsafe {
             // creates buffer
             let mut buffer = MaybeUninit::<VkBuffer>::zeroed();
@@ -105,11 +104,12 @@ impl<'a, 'b> BufferMemory<'a, 'b> {
             vkBindBufferMemory(device.handle(), buffer, memory, 0)
                 .into_result()
                 .unwrap();
-            Ok(BufferMemory { 
+            let buffer_memory = BufferMemory { 
                 buffer: buffer,
                 memory: memory,
-                device: device,
-            })
+                device: Arc::clone(device),
+            };
+            Ok(Arc::new(buffer_memory))
         }
     }
 
@@ -124,7 +124,7 @@ impl<'a, 'b> BufferMemory<'a, 'b> {
     }
 }
 
-impl<'a, 'b> Drop for BufferMemory<'a, 'b> {
+impl Drop for BufferMemory {
     fn drop(&mut self) {
         unsafe {
             println!("Drop BufferMemory");
@@ -136,23 +136,24 @@ impl<'a, 'b> Drop for BufferMemory<'a, 'b> {
     }
 }
 
-pub struct CommandPool<'a, 'b: 'a> {
+pub struct CommandPool {
     handle: VkCommandPool,
-    device: &'b Device<'a>,
+    device: Arc<Device>,
 }
 
-impl<'a, 'b> CommandPool<'a, 'b> {
-    pub fn new(device: &'b Device<'a>) -> Result<Self> {
+impl CommandPool {
+    pub fn new(device: &Arc<Device>) -> Result<Arc<Self>> {
         unsafe {
             let mut handle = MaybeUninit::<VkCommandPool>::zeroed();
             let info = VkCommandPoolCreateInfo::new(device.queue().family().index() as u32);
             vkCreateCommandPool(device.handle, &info, ptr::null(), handle.as_mut_ptr())
                 .into_result()?;
             let handle = handle.assume_init();
-            Ok(CommandPool {
+            let command_pool = CommandPool {
                 handle: handle,
-                device: device,
-            })
+                device: Arc::clone(device),
+            };
+            Ok(Arc::new(command_pool))
         }
     }
 
@@ -162,12 +163,12 @@ impl<'a, 'b> CommandPool<'a, 'b> {
     }
 
     #[inline]
-    pub fn device(&self) -> &Device {
-        self.device
+    pub fn device(&self) -> &Arc<Device> {
+        &self.device
     }
 }
 
-impl<'a, 'b> Drop for CommandPool<'a, 'b> {
+impl Drop for CommandPool {
     fn drop(&mut self) {
         println!("Drop CommandPool");
         unsafe {
@@ -199,16 +200,16 @@ impl Queue {
 }
 
 pub struct DeviceBuilder<'a> {
-    instance: &'a Instance,
+    instance: &'a Arc<Instance>,
 }
 
 impl<'a> DeviceBuilder<'a> {
-    pub fn new(instance: &'a Instance) -> Self {
+    pub fn new(instance: &'a Arc<Instance>) -> Self {
         DeviceBuilder { instance }
     }
 
-    pub fn build(self) -> Result<Device<'a>> {
-        let devices = self.instance.physical_devices()?;
+    pub fn build(self) -> Result<Arc<Device>> {
+        let devices = PhysicalDevicesBuilder::new(self.instance).build()?;
         let device = devices.into_iter()
             .nth(0)
             .ok_or_else(|| ErrorCode::SuitablePhysicalDeviceNotFound)?;
@@ -234,23 +235,23 @@ impl<'a> DeviceBuilder<'a> {
             let mut queue = MaybeUninit::<VkQueue>::zeroed();
             vkGetDeviceQueue(handle, family_index, 0, queue.as_mut_ptr());
             let queue = Queue::new(queue.assume_init(), family);
-            Ok(Device {
+            let device = Device {
                 handle: handle,
                 queue: queue,
                 physical_device: device,
-                instance: self.instance,
-            })
+            };
+            Ok(Arc::new(device))
         }
     }
 }
 
-pub struct ShaderModule<'a, 'b: 'a> {
+pub struct ShaderModule {
     handle: VkShaderModule,
-    device: &'b Device<'a>,
+    device: Arc<Device>,
 }
 
-impl<'a, 'b> ShaderModule<'a, 'b> {
-    pub fn new(device: &'b Device<'a>) -> std::io::Result<Self> {
+impl ShaderModule {
+    pub fn new(device: &Arc<Device>) -> std::io::Result<Arc<Self>> {
         let mut file = std::fs::File::open("data/headless.comp.spv")?;
         let mut buffer = Vec::<u8>::new();
         let bytes = file.read_to_end(&mut buffer)?;
@@ -263,10 +264,11 @@ impl<'a, 'b> ShaderModule<'a, 'b> {
                 .into_result()
                 .unwrap();
             let handle = handle.assume_init();
-            Ok(ShaderModule {
+            let shader_module = ShaderModule {
                 handle: handle,
-                device: device,
-            })
+                device: Arc::clone(device),
+            };
+            Ok(Arc::new(shader_module))
         }
     }
 
@@ -276,7 +278,7 @@ impl<'a, 'b> ShaderModule<'a, 'b> {
     }
 }
 
-impl<'a, 'b> Drop for ShaderModule<'a, 'b> {
+impl Drop for ShaderModule {
     fn drop(&mut self) {
         println!("Drop ShaderModule");
         unsafe {

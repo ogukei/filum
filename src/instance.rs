@@ -8,6 +8,7 @@ use std::mem;
 use std::ffi::{CStr, CString};
 use std::mem::MaybeUninit;
 use libc::{c_float, c_void};
+use std::sync::Arc;
 
 use std::io::Read;
 
@@ -17,9 +18,9 @@ pub struct Instance {
 }
 
 impl Instance {
-    pub fn new() -> Result<Instance> {
+    pub fn new() -> Result<Arc<Instance>> {
         let application_name = CString::new("stala")?;
-        let engine_name = CString::new("Stalagmite Engine")?;
+        let engine_name = CString::new("Stalactite Engine")?;
         let app_info = VkApplicationInfo::new(application_name.as_ptr(), 0, engine_name.as_ptr(), 0);
         let instance_info = VkInstanceCreateInfo::new(&app_info);
         unsafe {
@@ -27,26 +28,8 @@ impl Instance {
             vkCreateInstance(&instance_info, ptr::null(), handle.as_mut_ptr())
                 .into_result()?;
             let handle = handle.assume_init();
-            Ok(Instance { handle: handle })
-        }
-    }
-
-    pub fn physical_devices(&self) -> Result<Vec<PhysicalDevice>> {
-        unsafe {
-            let mut count = MaybeUninit::<u32>::zeroed();
-            // obtain count
-            vkEnumeratePhysicalDevices(self.handle, count.as_mut_ptr(), ptr::null_mut())
-                .into_result()?;
-            // obtain items
-            let size: usize = count.assume_init() as usize;
-            let mut devices: Vec<VkPhysicalDevice> = Vec::with_capacity(size);
-            devices.resize(size, ptr::null_mut());
-            vkEnumeratePhysicalDevices(self.handle, count.as_mut_ptr(), devices.as_mut_ptr())
-                .into_result()?;
-            let devices: Vec<PhysicalDevice> = devices.into_iter()
-                .map(|v| PhysicalDevice::new(v, self))
-                .collect();
-            Ok(devices)
+            let instance = Instance { handle: handle };
+            Ok(Arc::new(instance))
         }
     }
 
@@ -66,20 +49,56 @@ impl Drop for Instance {
     }
 }
 
-#[derive(Debug)]
-pub struct PhysicalDevice<'a> {
-    handle: VkPhysicalDevice,
-    instance: &'a Instance,
+pub struct PhysicalDevicesBuilder<'a> {
+    instance: &'a Arc<Instance>,
 }
 
-impl<'a> PhysicalDevice<'a> {
-    pub fn new(device: VkPhysicalDevice, instance: &'a Instance) -> Self {
-        PhysicalDevice { handle: device, instance: instance }
+impl<'a> PhysicalDevicesBuilder<'a> {
+    pub fn new(instance: &'a Arc<Instance>) -> Self {
+        PhysicalDevicesBuilder { instance: instance }
+    }
+
+    pub fn build(self) -> Result<Vec<Arc<PhysicalDevice>>> {
+        let instance = self.instance;
+        unsafe {
+            let mut count = MaybeUninit::<u32>::zeroed();
+            // obtain count
+            vkEnumeratePhysicalDevices(instance.handle, count.as_mut_ptr(), ptr::null_mut())
+                .into_result()?;
+            // obtain items
+            let size: usize = count.assume_init() as usize;
+            let mut devices: Vec<VkPhysicalDevice> = Vec::with_capacity(size);
+            devices.resize(size, ptr::null_mut());
+            vkEnumeratePhysicalDevices(instance.handle, count.as_mut_ptr(), devices.as_mut_ptr())
+                .into_result()?;
+            let devices: Vec<Arc<PhysicalDevice>> = devices.into_iter()
+                .map(|v| PhysicalDevice::new(v, instance))
+                .map(|v| Arc::new(v))
+                .collect();
+            Ok(devices)
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct PhysicalDevice {
+    handle: VkPhysicalDevice,
+    instance: Arc<Instance>,
+}
+
+impl PhysicalDevice {
+    pub fn new(device: VkPhysicalDevice, instance: &Arc<Instance>) -> Self {
+        PhysicalDevice { handle: device, instance: Arc::clone(instance) }
     }
 
     #[inline]
     pub fn handle(&self) -> VkPhysicalDevice {
         self.handle
+    }
+
+    #[inline]
+    pub fn instance(&self) -> &Arc<Instance> {
+        &self.instance
     }
 
     pub fn properties(&self) -> VkPhysicalDeviceProperties {
