@@ -5,6 +5,7 @@ use super::dispatch::{StagingBuffer, ComputePipeline, CommandDispatch};
 
 use super::error::Result;
 use std::sync::Arc;
+use std::marker::PhantomData;
 
 pub struct Context {
     instance: Arc<Instance>,
@@ -24,14 +25,14 @@ impl Context {
 
 pub struct PipelineLayout<T> where T: Sized + std::fmt::Debug {
     count: usize,
-    value: T,
+    value: PhantomData<T>,
 }
 
 impl<T> PipelineLayout<T> where T: Sized + std::fmt::Debug {
     fn new(count: usize) -> Self {
         PipelineLayout {
             count: count,
-            value: unsafe { std::mem::zeroed() },
+            value: PhantomData,
         }
     }
 }
