@@ -251,8 +251,8 @@ pub struct ShaderModule {
 }
 
 impl ShaderModule {
-    pub fn new(device: &Arc<Device>) -> std::io::Result<Arc<Self>> {
-        let mut file = std::fs::File::open("data/headless.comp.spv")?;
+    pub fn new<S: Into<String>>(device: &Arc<Device>, filename: S) -> std::io::Result<Arc<Self>> {
+        let mut file = std::fs::File::open(filename.into())?;
         let mut buffer = Vec::<u8>::new();
         let bytes = file.read_to_end(&mut buffer)?;
         assert!(bytes > 0);
