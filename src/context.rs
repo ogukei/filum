@@ -1,7 +1,7 @@
 
 use super::instance::{Instance};
 use super::device::{Device, DeviceBuilder, CommandPool, ShaderModule};
-use super::dispatch::{StagingBuffer, ComputePipeline, CommandDispatch};
+use super::dispatch::{StagingBuffer, ComputePipeline, CommandDispatch, BufferMemoryLayout};
 
 use super::error::Result;
 use std::sync::Arc;
@@ -87,16 +87,21 @@ pub struct Pipeline<T> where T: Sized + std::fmt::Debug {
     shader_module: Arc<ShaderModule>,
     staging_buffer: Arc<StagingBuffer>,
     compute_pipeline: Arc<ComputePipeline>,
+    command_dispatch: Arc<CommandDispatch>,
+    buffer_memory_layout: BufferMemoryLayout<T>,
 }
 
 impl<T> Pipeline<T> where T: Sized + std::fmt::Debug {
     fn new<S: Into<String>>(context: &Arc<Context>, layout: PipelineLayout<T>, shader: S) -> Result<Arc<Self>> {
         let instance = context.instance();
         let device = DeviceBuilder::new(&instance).build()?;
+        println!("GPU: {:?}", device.physical_device().properties().device_name());
         let command_pool = CommandPool::new(&device)?;
         let shader_module = ShaderModule::new(&device, shader).unwrap();
-        let staging_buffer = StagingBuffer::new(&command_pool);
+        let buffer_memory_layout = BufferMemoryLayout::<T>::new(layout.count);
+        let staging_buffer = StagingBuffer::new(&command_pool, &buffer_memory_layout);
         let compute_pipeline = ComputePipeline::new(&staging_buffer, &shader_module);
+        let command_dispatch = CommandDispatch::new(&compute_pipeline);
         let pipeline = Pipeline {
             layout: layout,
             context: Arc::clone(context),
@@ -105,15 +110,16 @@ impl<T> Pipeline<T> where T: Sized + std::fmt::Debug {
             shader_module: shader_module,
             staging_buffer: staging_buffer,
             compute_pipeline: compute_pipeline,
+            command_dispatch: command_dispatch,
+            buffer_memory_layout: buffer_memory_layout,
         };
         Ok(Arc::new(pipeline))
     }
 
-    pub fn compute(&self, input: &Vec<T>) {
-        let mut vec = Vec::<T>::with_capacity(self.layout.count);
-        vec.resize_with(self.layout.count, || unsafe { std::mem::zeroed() });
-        println!("{:?}", vec);
-        let command_dispatch = CommandDispatch::new(&self.compute_pipeline);
-        println!("{:?}", command_dispatch.output);
+    pub fn compute(&self, input: &mut Vec<T>) {
+        self.staging_buffer.write_host_memory(&self.buffer_memory_layout, input);
+        self.command_dispatch.dispatch();
+        self.staging_buffer.read_host_memory(&self.buffer_memory_layout, input);
+        println!("{:?}", input);
     }
 }

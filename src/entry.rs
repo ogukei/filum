@@ -1,17 +1,13 @@
 
-
-use super::instance::{Instance};
-use super::device::{DeviceBuilder, CommandPool, ShaderModule};
-use super::dispatch::{StagingBuffer, ComputePipeline, CommandDispatch};
-
 use super::context::{Context, PipelineBuilder};
 
 pub fn initialize() {
     let context = Context::new().unwrap();
     let pipeline = PipelineBuilder::new(&context)
         .shader("data/headless.comp.spv")
-        .layout::<u32>(24)
+        .layout::<u32>(30)
         .build()
         .unwrap();
-    pipeline.compute(&vec![1, 2, 3, 4]);
+    pipeline.compute(&mut (0..30).collect());
+    pipeline.compute(&mut (0..30).collect());
 }

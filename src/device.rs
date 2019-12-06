@@ -49,6 +49,7 @@ pub struct BufferMemory {
     buffer: VkBuffer,
     memory: VkDeviceMemory,
     device: Arc<Device>,
+    size: VkDeviceSize,
 }
 
 impl BufferMemory {
@@ -108,6 +109,7 @@ impl BufferMemory {
                 buffer: buffer,
                 memory: memory,
                 device: Arc::clone(device),
+                size: size,
             };
             Ok(Arc::new(buffer_memory))
         }
@@ -121,6 +123,41 @@ impl BufferMemory {
     #[inline]
     pub fn memory(&self) -> VkDeviceMemory {
         self.memory
+    }
+
+    pub fn write_memory(&self, source: *mut c_void) {
+        unsafe {
+            let device: &Device = &self.device;
+            let memory = self.memory;
+            let size = self.size;
+            let mut mapped = MaybeUninit::<*mut c_void>::zeroed();
+            vkMapMemory(device.handle(), memory, 0, VK_WHOLE_SIZE, 0, mapped.as_mut_ptr())
+                .into_result()
+                .unwrap();
+            let mapped = mapped.assume_init();
+            ptr::copy_nonoverlapping(source as *mut u8, mapped as *mut u8, size as usize);
+            let mapped_memory_range = VkMappedMemoryRange::new(memory, 0, VK_WHOLE_SIZE);
+            vkFlushMappedMemoryRanges(device.handle(), 1, &mapped_memory_range)
+                .into_result()
+                .unwrap();
+            vkUnmapMemory(device.handle(), memory);
+        }
+    }
+
+    pub fn read_memory(&self, destination: *mut c_void) {
+        unsafe {
+            let device: &Device = &self.device;
+            let memory = self.memory;
+            let size = self.size;
+            // Make device writes visible to the host
+            let mut mapped = MaybeUninit::<*mut c_void>::zeroed();
+            vkMapMemory(device.handle(), memory, 0, VK_WHOLE_SIZE, 0, mapped.as_mut_ptr());
+            let mapped = mapped.assume_init();
+            let mapped_range = VkMappedMemoryRange::new(memory, 0, VK_WHOLE_SIZE);
+            vkInvalidateMappedMemoryRanges(device.handle(), 1, &mapped_range);
+            ptr::copy_nonoverlapping(mapped as *mut u8, destination as *mut u8, size as usize);
+            vkUnmapMemory(device.handle(), memory);
+        }
     }
 }
 
