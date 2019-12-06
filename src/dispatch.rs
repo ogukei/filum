@@ -21,7 +21,7 @@ pub struct CommandDispatch {
 }
 
 impl CommandDispatch {
-    pub fn new(compute_pipeline: &Arc<ComputePipeline>) -> Arc<Self> {
+    pub fn new(compute_pipeline: &Arc<ComputePipeline>, workgroup_size: WorkgroupSize) -> Arc<Self> {
         let staging_buffer = compute_pipeline.staging_buffer();
         let command_pool = staging_buffer.command_pool();
         let device = command_pool.device();
@@ -87,7 +87,7 @@ impl CommandDispatch {
                 0,
                 ptr::null()
             );
-            vkCmdDispatch(command_buffer, staging_buffer.buffer_element_count as u32, 1, 1);
+            vkCmdDispatch(command_buffer, workgroup_size.x, workgroup_size.y, workgroup_size.z);
             // Barrier to ensure that shader writes are finished before buffer is read back from GPU
             {
                 let buffer_barrier = VkBufferMemoryBarrier::new(
@@ -174,6 +174,12 @@ impl Drop for CommandDispatch {
             self.command_buffer = ptr::null_mut();
         }
     }
+}
+
+pub struct WorkgroupSize {
+    pub x: u32,
+    pub y: u32,
+    pub z: u32,
 }
 
 pub struct ComputePipeline {
@@ -375,14 +381,14 @@ impl StagingBuffer {
         Arc::new(staging_buffer)
     }
 
-    pub fn write_host_memory<T: Sized>(&self, layout: &BufferMemoryLayout<T>, vec: &mut Vec<T>) {
+    pub fn write_host_memory<T: Sized>(&self, layout: &BufferMemoryLayout<T>, vec: &mut [T]) {
         assert_eq!(vec.len(), layout.element_count());
         assert_eq!(std::mem::size_of::<T>() * vec.len(), layout.buffer_size() as usize);
         // writes memory
         self.host_buffer_memory.write_memory(vec.as_mut_ptr() as *mut c_void);
     }
 
-    pub fn read_host_memory<T: Sized>(&self, layout: &BufferMemoryLayout<T>, vec: &mut Vec<T>) {
+    pub fn read_host_memory<T: Sized>(&self, layout: &BufferMemoryLayout<T>, vec: &mut [T]) {
         assert_eq!(vec.len(), layout.element_count());
         assert_eq!(std::mem::size_of::<T>() * vec.len(), layout.buffer_size() as usize);
         // reads memory
