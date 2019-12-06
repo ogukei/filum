@@ -12,21 +12,49 @@ use std::mem::MaybeUninit;
 use libc::{c_float, c_void};
 use std::sync::Arc;
 use std::io::Read;
+use std::marker::PhantomData;
 
 pub struct CommandDispatch {
-    pub output: Vec<u32>,
+    compute_pipeline: Arc<ComputePipeline>,
+    command_buffer: VkCommandBuffer,
+    fence: VkFence,
 }
 
 impl CommandDispatch {
-    pub fn new(pipeline: &Arc<ComputePipeline>) -> Arc<Self> {
-        let staging_buffer = pipeline.staging_buffer();
-        let device = staging_buffer.command_pool().device();
+    pub fn new(compute_pipeline: &Arc<ComputePipeline>) -> Arc<Self> {
+        let staging_buffer = compute_pipeline.staging_buffer();
+        let command_pool = staging_buffer.command_pool();
+        let device = command_pool.device();
         unsafe {
-            let command_buffer = pipeline.command_buffer;
+            let mut command_buffer = MaybeUninit::<VkCommandBuffer>::zeroed();
+            {
+                let alloc_info = VkCommandBufferAllocateInfo::new(command_pool.handle(), VkCommandBufferLevel::VK_COMMAND_BUFFER_LEVEL_PRIMARY, 1);
+                vkAllocateCommandBuffers(device.handle(), &alloc_info, command_buffer.as_mut_ptr())
+                    .into_result()
+                    .unwrap();
+            }
+            let command_buffer = command_buffer.assume_init();
+            let mut fence = MaybeUninit::<VkFence>::zeroed();
+            {
+                let create_info = VkFenceCreateInfo::new(VkFenceCreateFlagBits::VK_FENCE_CREATE_SIGNALED_BIT as VkFlags);
+                vkCreateFence(device.handle(), &create_info, ptr::null(), fence.as_mut_ptr())
+                    .into_result()
+                    .unwrap();
+            }
+            let fence = fence.assume_init();
             let begin_info = VkCommandBufferBeginInfo::new();
             vkBeginCommandBuffer(command_buffer, &begin_info)
                 .into_result()
                 .unwrap();
+            // copy to staging buffer
+            let copy_region = VkBufferCopy::new(staging_buffer.buffer_size);
+            vkCmdCopyBuffer(
+                command_buffer, 
+                staging_buffer.host_buffer_memory().buffer(), 
+                staging_buffer.device_buffer_memory().buffer(), 
+                1,
+                &copy_region
+            );
             // Barrier to ensure that input buffer transfer is finished before compute shader reads from it
             {
                 let buffer_barrier = VkBufferMemoryBarrier::new(
@@ -48,14 +76,14 @@ impl CommandDispatch {
             vkCmdBindPipeline(
                 command_buffer,
                 VkPipelineBindPoint::VK_PIPELINE_BIND_POINT_COMPUTE,
-                pipeline.handle);
+                compute_pipeline.handle);
             vkCmdBindDescriptorSets(
                 command_buffer,
                 VkPipelineBindPoint::VK_PIPELINE_BIND_POINT_COMPUTE,
-                pipeline.layout,
+                compute_pipeline.layout,
                 0,
                 1,
-                &pipeline.descriptor_set,
+                &compute_pipeline.descriptor_set,
                 0,
                 ptr::null()
             );
@@ -105,8 +133,21 @@ impl CommandDispatch {
                 );
             }
             vkEndCommandBuffer(command_buffer);
-            // submit compute work
-            let fence = pipeline.fence;
+            let command_dispatch = CommandDispatch {
+                compute_pipeline: Arc::clone(compute_pipeline),
+                command_buffer: command_buffer,
+                fence: fence,
+            };
+            Arc::new(command_dispatch)
+        }
+    }
+
+    pub fn dispatch(&self) {
+        unsafe {
+            let staging_buffer = self.compute_pipeline.staging_buffer();
+            let device = staging_buffer.command_pool().device();
+            let fence = self.fence;
+            let command_buffer = self.command_buffer;
             vkResetFences(device.handle(), 1, &fence)
                 .into_result()
                 .unwrap();
@@ -116,22 +157,21 @@ impl CommandDispatch {
             vkWaitForFences(device.handle(), 1, &fence, VK_TRUE, u64::max_value())
                 .into_result()
                 .unwrap();
-            // Make device writes visible to the host
-            let mut mapped = MaybeUninit::<*mut c_void>::zeroed();
-            vkMapMemory(device.handle(), staging_buffer.host_buffer_memory().memory(), 0, VK_WHOLE_SIZE, 0, mapped.as_mut_ptr());
-            let mapped = mapped.assume_init();
-            let mapped_range = VkMappedMemoryRange::new(staging_buffer.host_buffer_memory().memory(), 0, VK_WHOLE_SIZE);
-            vkInvalidateMappedMemoryRanges(device.handle(), 1, &mapped_range);
-            let mut output: Vec<u32> = Vec::with_capacity(staging_buffer.buffer_element_count);
-            {
-                output.resize(staging_buffer.buffer_element_count, 0);
-                ptr::copy_nonoverlapping(mapped, output.as_mut_ptr() as *mut c_void, staging_buffer.buffer_size as usize);
-            }
-            vkUnmapMemory(device.handle(), staging_buffer.host_buffer_memory().memory());
-            // compute work done
-            vkQueueWaitIdle(device.queue().handle());
-            let command_dispatch = CommandDispatch { output: output };
-            Arc::new(command_dispatch)
+        }
+    }
+}
+
+impl Drop for CommandDispatch {
+    fn drop(&mut self) {
+        println!("Drop CommandDispatch");
+        unsafe {
+            let staging_buffer = self.compute_pipeline.staging_buffer();
+            let command_pool = staging_buffer.command_pool();
+            let device = command_pool.device();
+            vkDestroyFence(device.handle(), self.fence, ptr::null());
+            self.fence = ptr::null_mut();
+            vkFreeCommandBuffers(device.handle(), command_pool.handle(), 1, &self.command_buffer);
+            self.command_buffer = ptr::null_mut();
         }
     }
 }
@@ -143,8 +183,6 @@ pub struct ComputePipeline {
     descriptor_pool: VkDescriptorPool,
     descriptor_set_layout: VkDescriptorSetLayout,
     descriptor_set: VkDescriptorSet,
-    command_buffer: VkCommandBuffer,
-    fence: VkFence,
     staging_buffer: Arc<StagingBuffer>,
     shader_module: Arc<ShaderModule>,
 }
@@ -233,22 +271,6 @@ impl ComputePipeline {
                     .unwrap();
             }
             let compute_pipeline = compute_pipeline.assume_init();
-            let mut command_buffer = MaybeUninit::<VkCommandBuffer>::zeroed();
-            {
-                let alloc_info = VkCommandBufferAllocateInfo::new(command_pool.handle(), VkCommandBufferLevel::VK_COMMAND_BUFFER_LEVEL_PRIMARY, 1);
-                vkAllocateCommandBuffers(device.handle(), &alloc_info, command_buffer.as_mut_ptr())
-                    .into_result()
-                    .unwrap();
-            }
-            let command_buffer = command_buffer.assume_init();
-            let mut fence = MaybeUninit::<VkFence>::zeroed();
-            {
-                let create_info = VkFenceCreateInfo::new(VkFenceCreateFlagBits::VK_FENCE_CREATE_SIGNALED_BIT as VkFlags);
-                vkCreateFence(device.handle(), &create_info, ptr::null(), fence.as_mut_ptr())
-                    .into_result()
-                    .unwrap();
-            }
-            let fence = fence.assume_init();
             let compute_pipeline = ComputePipeline {
                 handle: compute_pipeline,
                 cache: pipeline_cache,
@@ -256,8 +278,6 @@ impl ComputePipeline {
                 descriptor_pool: descriptor_pool,
                 descriptor_set_layout: descriptor_set_layout,
                 descriptor_set: descriptor_set,
-                command_buffer: command_buffer,
-                fence: fence,
                 shader_module: Arc::clone(shader_module),
                 staging_buffer: Arc::clone(staging_buffer),
             };
@@ -286,11 +306,32 @@ impl Drop for ComputePipeline {
             self.handle = ptr::null_mut();
             vkDestroyPipelineCache(device.handle(), self.cache, ptr::null());
             self.cache = ptr::null_mut();
-            vkDestroyFence(device.handle(), self.fence, ptr::null());
-            self.fence = ptr::null_mut();
-            vkFreeCommandBuffers(device.handle(), command_pool.handle(), 1, &self.command_buffer);
-            self.command_buffer = ptr::null_mut();
         }
+    }
+}
+
+pub struct BufferMemoryLayout<T: Sized> {
+    buffer_size: VkDeviceSize,
+    element_count: usize,
+    value: PhantomData<T>
+}
+
+impl<T> BufferMemoryLayout<T> where T: Sized {
+    pub fn new(element_count: usize) -> Self {
+        let buffer_size = (element_count * mem::size_of::<T>()) as VkDeviceSize;
+        BufferMemoryLayout {
+            buffer_size,
+            element_count,
+            value: PhantomData
+        }
+    }
+
+    pub fn element_count(&self) -> usize {
+       self.element_count 
+    }
+
+    pub fn buffer_size(&self) -> VkDeviceSize {
+        self.buffer_size
     }
 }
 
@@ -303,85 +344,49 @@ pub struct StagingBuffer {
 }
 
 impl StagingBuffer {
-    pub fn new(command_pool: &Arc<CommandPool>) -> Arc<Self> {
-        unsafe {
-            let device = command_pool.device();
-            println!("device: {:?}, command pool: {:?}", device.handle(), command_pool.handle());
-            const BUFFER_ELEMENTS: usize = 32;
-            let buffer_size = (BUFFER_ELEMENTS * mem::size_of::<u32>()) as VkDeviceSize;
-            let mut input: Vec<u32> = Vec::with_capacity(BUFFER_ELEMENTS);
-            input.resize(BUFFER_ELEMENTS, 0);
-            for (i, v) in input.iter_mut().enumerate() {
-                *v = i as u32
-            }
-            // host buffer
-            let host_buffer_memory = BufferMemory::new(
-                device,
-                VkBufferUsageFlagBits::VK_BUFFER_USAGE_TRANSFER_SRC_BIT as u32 | 
-                    VkBufferUsageFlagBits::VK_BUFFER_USAGE_TRANSFER_DST_BIT as u32, 
-                VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT as u32,
-                buffer_size,
-                input.as_mut_ptr() as *mut c_void).unwrap();
-            // Flush writes to host visible buffer
-            let mut mapped = MaybeUninit::<*mut c_void>::zeroed();
-            vkMapMemory(device.handle(), host_buffer_memory.memory(), 0, VK_WHOLE_SIZE, 0, mapped.as_mut_ptr())
-                .into_result()
-                .unwrap();
-            let mapped_memory_range = VkMappedMemoryRange::new(host_buffer_memory.memory(), 0, VK_WHOLE_SIZE);
-            vkFlushMappedMemoryRanges(device.handle(), 1, &mapped_memory_range)
-                .into_result()
-                .unwrap();
-            vkUnmapMemory(device.handle(), host_buffer_memory.memory());
-            // device buffer
-            let device_buffer_memory = BufferMemory::new(
-                device,
-                VkBufferUsageFlagBits::VK_BUFFER_USAGE_TRANSFER_SRC_BIT as u32 | 
-                    VkBufferUsageFlagBits::VK_BUFFER_USAGE_TRANSFER_DST_BIT as u32 |
-                    VkBufferUsageFlagBits::VK_BUFFER_USAGE_STORAGE_BUFFER_BIT as u32,
-                VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT as u32,
-                buffer_size,
-                ptr::null_mut()).unwrap();
-            // Copy to staging buffer
-            let allocate_info = VkCommandBufferAllocateInfo::new(command_pool.handle(), VkCommandBufferLevel::VK_COMMAND_BUFFER_LEVEL_PRIMARY, 1);
-            let mut copy_command = MaybeUninit::<VkCommandBuffer>::zeroed();
-            vkAllocateCommandBuffers(device.handle(), &allocate_info, copy_command.as_mut_ptr())
-                .into_result()
-                .unwrap();
-            let copy_command = copy_command.assume_init();
-            let begin_info = VkCommandBufferBeginInfo::new();
-            vkBeginCommandBuffer(copy_command, &begin_info)
-                .into_result()
-                .unwrap();
-            let copy_region = VkBufferCopy::new(buffer_size);
-            vkCmdCopyBuffer(copy_command, host_buffer_memory.buffer(), device_buffer_memory.buffer(), 1, &copy_region);
-            vkEndCommandBuffer(copy_command)
-                .into_result()
-                .unwrap();
-            let submit_info = VkSubmitInfo::with_command_buffer(1, &copy_command);
-            let fence_info = VkFenceCreateInfo::new(VK_FLAGS_NONE);
-            let mut fence = MaybeUninit::<VkFence>::zeroed();
-            vkCreateFence(device.handle(), &fence_info, ptr::null(), fence.as_mut_ptr())
-                .into_result()
-                .unwrap();
-            let fence = fence.assume_init();
-            // submit to the queue
-            vkQueueSubmit(device.queue().handle(), 1, &submit_info, fence)
-                .into_result()
-                .unwrap();
-            vkWaitForFences(device.handle(), 1, &fence, VK_TRUE, u64::max_value())
-                .into_result()
-                .unwrap();
-            vkDestroyFence(device.handle(), fence, ptr::null());
-            vkFreeCommandBuffers(device.handle(), command_pool.handle(), 1, &copy_command);
-            let staging_buffer = StagingBuffer {
-                buffer_element_count: BUFFER_ELEMENTS,
-                buffer_size: buffer_size,
-                device_buffer_memory: device_buffer_memory,
-                host_buffer_memory: host_buffer_memory,
-                command_pool: Arc::clone(command_pool),
-            };
-            Arc::new(staging_buffer)
-        }
+    pub fn new<T: Sized>(command_pool: &Arc<CommandPool>, layout: &BufferMemoryLayout<T>) -> Arc<Self> {
+        let device = command_pool.device();
+        let buffer_size = layout.buffer_size();
+        let element_count = layout.element_count();
+        // host buffer
+        let host_buffer_memory = BufferMemory::new(
+            device,
+            VkBufferUsageFlagBits::VK_BUFFER_USAGE_TRANSFER_SRC_BIT as u32 | 
+                VkBufferUsageFlagBits::VK_BUFFER_USAGE_TRANSFER_DST_BIT as u32, 
+            VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT as u32,
+            buffer_size,
+            ptr::null_mut()).unwrap();
+        // device buffer
+        let device_buffer_memory = BufferMemory::new(
+            device,
+            VkBufferUsageFlagBits::VK_BUFFER_USAGE_TRANSFER_SRC_BIT as u32 | 
+                VkBufferUsageFlagBits::VK_BUFFER_USAGE_TRANSFER_DST_BIT as u32 |
+                VkBufferUsageFlagBits::VK_BUFFER_USAGE_STORAGE_BUFFER_BIT as u32,
+            VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT as u32,
+            buffer_size,
+            ptr::null_mut()).unwrap();
+        let staging_buffer = StagingBuffer {
+            buffer_element_count: element_count,
+            buffer_size: buffer_size,
+            device_buffer_memory: device_buffer_memory,
+            host_buffer_memory: host_buffer_memory,
+            command_pool: Arc::clone(command_pool),
+        };
+        Arc::new(staging_buffer)
+    }
+
+    pub fn write_host_memory<T: Sized>(&self, layout: &BufferMemoryLayout<T>, vec: &mut Vec<T>) {
+        assert_eq!(vec.len(), layout.element_count());
+        assert_eq!(std::mem::size_of::<T>() * vec.len(), layout.buffer_size() as usize);
+        // writes memory
+        self.host_buffer_memory.write_memory(vec.as_mut_ptr() as *mut c_void);
+    }
+
+    pub fn read_host_memory<T: Sized>(&self, layout: &BufferMemoryLayout<T>, vec: &mut Vec<T>) {
+        assert_eq!(vec.len(), layout.element_count());
+        assert_eq!(std::mem::size_of::<T>() * vec.len(), layout.buffer_size() as usize);
+        // reads memory
+        self.host_buffer_memory.read_memory(vec.as_mut_ptr() as *mut c_void);
     }
 
     #[inline]
@@ -402,6 +407,6 @@ impl StagingBuffer {
 
 impl Drop for StagingBuffer {
     fn drop(&mut self) {
-        println!("Drop StagingBuffer")
+        println!("Drop StagingBuffer");
     }
 }
