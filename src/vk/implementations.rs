@@ -206,13 +206,13 @@ impl VkSubmitInfo {
     pub fn with_command_buffer_wait(
         count: u32,
         buffers: *const VkCommandBuffer,
-        waitDstStageMask: *const VkPipelineStageFlags) -> Self {
+        wait_dst_stage_mask: *const VkPipelineStageFlags) -> Self {
         VkSubmitInfo {
             sType: VkStructureType::VK_STRUCTURE_TYPE_SUBMIT_INFO,
             pNext: ptr::null(),
             waitSemaphoreCount: 0,
             pWaitSemaphores: ptr::null(),
-            pWaitDstStageMask: waitDstStageMask,
+            pWaitDstStageMask: wait_dst_stage_mask,
             commandBufferCount: count,
             pCommandBuffers: buffers,
             signalSemaphoreCount: 0,

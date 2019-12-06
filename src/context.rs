@@ -1,7 +1,7 @@
 
 use super::instance::{Instance};
 use super::device::{Device, DeviceBuilder, CommandPool, ShaderModule};
-use super::dispatch::{StagingBuffer, ComputePipeline, CommandDispatch, BufferMemoryLayout};
+use super::dispatch::{StagingBuffer, ComputePipeline, CommandDispatch, BufferMemoryLayout, WorkgroupSize};
 
 use super::error::Result;
 use std::sync::Arc;
@@ -37,43 +37,69 @@ impl<T> PipelineLayout<T> where T: Sized + std::fmt::Debug {
     }
 }
 
-pub struct PipelineBuilder<'a, ShaderType, LayoutType> {
+pub struct PipelineBuilder<'a, ShaderType, LayoutType, WorkgroupType> {
     shader: ShaderType,
     layout: LayoutType,
+    workgroup: WorkgroupType,
     context: &'a Arc<Context>,
 }
 
-impl<'a> PipelineBuilder<'a, (), ()> {
+impl<'a> PipelineBuilder<'a, (), (), ()> {
     pub fn new(context: &'a Arc<Context>) -> Self {
         PipelineBuilder {
             shader: (),
             layout: (),
+            workgroup: (),
             context: context,
         }
     }
 }
 
-impl<'a, T> PipelineBuilder<'a, String, PipelineLayout<T>> where T: Sized + std::fmt::Debug {
+impl<'a, T> PipelineBuilder<'a, String, PipelineLayout<T>, WorkgroupSize> where T: Sized + std::fmt::Debug {
     pub fn build(self) -> Result<Arc<Pipeline<T>>> {
-        Pipeline::new(self.context, self.layout, self.shader)
+        Pipeline::new(self.context, self.layout, self.shader, self.workgroup)
     }
 }
 
-impl<'a, LayoutType> PipelineBuilder<'a, (), LayoutType> {
-    pub fn shader<T: Into<String>>(self, shader: T) -> PipelineBuilder<'a, String, LayoutType> {
+impl<'a, LayoutType, WorkgroupType> PipelineBuilder<'a, (), LayoutType, WorkgroupType> {
+    pub fn shader<T: Into<String>>(self, shader: T) -> PipelineBuilder<'a, String, LayoutType, WorkgroupType> {
         PipelineBuilder {
             shader: shader.into(),
             layout: self.layout,
+            workgroup: self.workgroup,
             context: self.context,
         }
     }
 }
 
-impl<'a, ShaderType> PipelineBuilder<'a, ShaderType, ()> {
-    pub fn layout<T>(self, count: usize) -> PipelineBuilder<'a, ShaderType, PipelineLayout<T>> where T: Sized + std::fmt::Debug {
+impl<'a, ShaderType, WorkgroupType> PipelineBuilder<'a, ShaderType, (), WorkgroupType> {
+    pub fn layout<T>(self, count: usize) -> PipelineBuilder<'a, ShaderType, PipelineLayout<T>, WorkgroupType> where T: Sized + std::fmt::Debug {
         PipelineBuilder {
             shader: self.shader,
             layout: PipelineLayout::<T>::new(count),
+            workgroup: self.workgroup,
+            context: self.context,
+        }
+    }
+}
+
+impl<'a, ShaderType> PipelineBuilder<'a, ShaderType, (), ()> {
+    pub fn layout_x<T>(self, count: usize) -> PipelineBuilder<'a, ShaderType, PipelineLayout<T>, WorkgroupSize> where T: Sized + std::fmt::Debug {
+        PipelineBuilder {
+            shader: self.shader,
+            layout: PipelineLayout::<T>::new(count),
+            workgroup: WorkgroupSize { x: count as u32, y: 1, z: 1 },
+            context: self.context,
+        }
+    }
+}
+
+impl<'a, ShaderType, LayoutType> PipelineBuilder<'a, ShaderType, LayoutType, ()> {
+    pub fn workgroup(self, x: u32, y: u32, z: u32) -> PipelineBuilder<'a, ShaderType, LayoutType, WorkgroupSize> {
+        PipelineBuilder {
+            shader: self.shader,
+            layout: self.layout,
+            workgroup: WorkgroupSize { x, y, z },
             context: self.context,
         }
     }
@@ -92,7 +118,12 @@ pub struct Pipeline<T> where T: Sized + std::fmt::Debug {
 }
 
 impl<T> Pipeline<T> where T: Sized + std::fmt::Debug {
-    fn new<S: Into<String>>(context: &Arc<Context>, layout: PipelineLayout<T>, shader: S) -> Result<Arc<Self>> {
+    fn new<S: Into<String>>(
+        context: &Arc<Context>, 
+        layout: PipelineLayout<T>, 
+        shader: S, 
+        workgroup_size: WorkgroupSize) -> Result<Arc<Self>> {
+
         let instance = context.instance();
         let device = DeviceBuilder::new(&instance).build()?;
         println!("GPU: {:?}", device.physical_device().properties().device_name());
@@ -101,7 +132,7 @@ impl<T> Pipeline<T> where T: Sized + std::fmt::Debug {
         let buffer_memory_layout = BufferMemoryLayout::<T>::new(layout.count);
         let staging_buffer = StagingBuffer::new(&command_pool, &buffer_memory_layout);
         let compute_pipeline = ComputePipeline::new(&staging_buffer, &shader_module);
-        let command_dispatch = CommandDispatch::new(&compute_pipeline);
+        let command_dispatch = CommandDispatch::new(&compute_pipeline, workgroup_size);
         let pipeline = Pipeline {
             layout: layout,
             context: Arc::clone(context),
@@ -116,7 +147,7 @@ impl<T> Pipeline<T> where T: Sized + std::fmt::Debug {
         Ok(Arc::new(pipeline))
     }
 
-    pub fn compute(&self, input: &mut Vec<T>) {
+    pub fn compute(&self, input: &mut [T]) {
         self.staging_buffer.write_host_memory(&self.buffer_memory_layout, input);
         self.command_dispatch.dispatch();
         self.staging_buffer.read_host_memory(&self.buffer_memory_layout, input);
