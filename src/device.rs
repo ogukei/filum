@@ -37,7 +37,7 @@ impl Device {
 
 impl Drop for Device {
     fn drop(&mut self) {
-        println!("Drop Device");
+        log_debug!("Drop Device");
         unsafe {
             vkDestroyDevice(self.handle, ptr::null());
             self.handle = ptr::null_mut();
@@ -164,7 +164,7 @@ impl BufferMemory {
 impl Drop for BufferMemory {
     fn drop(&mut self) {
         unsafe {
-            println!("Drop BufferMemory");
+            log_debug!("Drop BufferMemory");
             vkDestroyBuffer(self.device.handle(), self.buffer, ptr::null());
             self.buffer = ptr::null_mut();
             vkFreeMemory(self.device.handle(), self.memory, ptr::null());
@@ -207,7 +207,7 @@ impl CommandPool {
 
 impl Drop for CommandPool {
     fn drop(&mut self) {
-        println!("Drop CommandPool");
+        log_debug!("Drop CommandPool");
         unsafe {
             vkDestroyCommandPool(self.device.handle(), self.handle, ptr::null());
             self.handle = ptr::null_mut();
@@ -317,7 +317,7 @@ impl ShaderModule {
 
 impl Drop for ShaderModule {
     fn drop(&mut self) {
-        println!("Drop ShaderModule");
+        log_debug!("Drop ShaderModule");
         unsafe {
             vkDestroyShaderModule(self.device.handle(), self.handle, ptr::null());
             self.handle = ptr::null_mut();
