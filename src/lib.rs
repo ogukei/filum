@@ -10,6 +10,5 @@ mod instance;
 mod device;
 mod dispatch;
 mod context;
-mod entry;
 
-pub use entry::initialize;
+pub use context::{Context, PipelineBuilder};
