@@ -126,7 +126,7 @@ impl<T> Pipeline<T> where T: Sized + std::fmt::Debug {
 
         let instance = context.instance();
         let device = DeviceBuilder::new(&instance).build()?;
-        println!("GPU: {:?}", device.physical_device().properties().device_name());
+        log_debug!("GPU: {:?}", device.physical_device().properties().device_name());
         let command_pool = CommandPool::new(&device)?;
         let shader_module = ShaderModule::new(&device, shader).unwrap();
         let buffer_memory_layout = BufferMemoryLayout::<T>::new(layout.count);
@@ -151,6 +151,5 @@ impl<T> Pipeline<T> where T: Sized + std::fmt::Debug {
         self.staging_buffer.write_host_memory(&self.buffer_memory_layout, input);
         self.command_dispatch.dispatch();
         self.staging_buffer.read_host_memory(&self.buffer_memory_layout, input);
-        println!("{:?}", input);
     }
 }

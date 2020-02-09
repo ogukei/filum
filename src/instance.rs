@@ -38,7 +38,7 @@ impl Instance {
 
 impl Drop for Instance {
     fn drop(&mut self) {
-        println!("Drop Instance");
+        log_debug!("Drop Instance");
         unsafe {
             vkDestroyInstance(self.handle, ptr::null());
             self.handle = ptr::null_mut();

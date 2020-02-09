@@ -163,7 +163,7 @@ impl CommandDispatch {
 
 impl Drop for CommandDispatch {
     fn drop(&mut self) {
-        println!("Drop CommandDispatch");
+        log_debug!("Drop CommandDispatch");
         unsafe {
             let staging_buffer = self.compute_pipeline.staging_buffer();
             let command_pool = staging_buffer.command_pool();
@@ -298,7 +298,7 @@ impl ComputePipeline {
 
 impl Drop for ComputePipeline {
     fn drop(&mut self) {
-        println!("Drop ComputePipeline");
+        log_debug!("Drop ComputePipeline");
         unsafe {
             let command_pool = self.staging_buffer.command_pool();
             let device = command_pool.device();
@@ -413,6 +413,6 @@ impl StagingBuffer {
 
 impl Drop for StagingBuffer {
     fn drop(&mut self) {
-        println!("Drop StagingBuffer");
+        log_debug!("Drop StagingBuffer");
     }
 }
