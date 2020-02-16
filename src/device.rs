@@ -49,7 +49,7 @@ pub struct BufferMemory {
     buffer: VkBuffer,
     memory: VkDeviceMemory,
     device: Arc<Device>,
-    size: VkDeviceSize,
+    whole_size: VkDeviceSize,
 }
 
 impl BufferMemory {
@@ -109,7 +109,7 @@ impl BufferMemory {
                 buffer: buffer,
                 memory: memory,
                 device: Arc::clone(device),
-                size: size,
+                whole_size: size,
             };
             Ok(Arc::new(buffer_memory))
         }
@@ -125,18 +125,17 @@ impl BufferMemory {
         self.memory
     }
 
-    pub fn write_memory(&self, source: *mut c_void) {
+    pub fn write_memory(&self, source: *const c_void, offset: VkDeviceSize, size: VkDeviceSize) {
         unsafe {
             let device: &Device = &self.device;
             let memory = self.memory;
-            let size = self.size;
             let mut mapped = MaybeUninit::<*mut c_void>::zeroed();
-            vkMapMemory(device.handle(), memory, 0, VK_WHOLE_SIZE, 0, mapped.as_mut_ptr())
+            vkMapMemory(device.handle(), memory, offset, size, 0, mapped.as_mut_ptr())
                 .into_result()
                 .unwrap();
             let mapped = mapped.assume_init();
-            ptr::copy_nonoverlapping(source as *mut u8, mapped as *mut u8, size as usize);
-            let mapped_memory_range = VkMappedMemoryRange::new(memory, 0, VK_WHOLE_SIZE);
+            ptr::copy_nonoverlapping(source as *const u8, mapped as *mut u8, size as usize);
+            let mapped_memory_range = VkMappedMemoryRange::new(memory, offset, size);
             vkFlushMappedMemoryRanges(device.handle(), 1, &mapped_memory_range)
                 .into_result()
                 .unwrap();
@@ -144,16 +143,15 @@ impl BufferMemory {
         }
     }
 
-    pub fn read_memory(&self, destination: *mut c_void) {
+    pub fn read_memory(&self, destination: *mut c_void, offset: VkDeviceSize, size: VkDeviceSize) {
         unsafe {
             let device: &Device = &self.device;
             let memory = self.memory;
-            let size = self.size;
             // Make device writes visible to the host
             let mut mapped = MaybeUninit::<*mut c_void>::zeroed();
-            vkMapMemory(device.handle(), memory, 0, VK_WHOLE_SIZE, 0, mapped.as_mut_ptr());
+            vkMapMemory(device.handle(), memory, offset, size, 0, mapped.as_mut_ptr());
             let mapped = mapped.assume_init();
-            let mapped_range = VkMappedMemoryRange::new(memory, 0, VK_WHOLE_SIZE);
+            let mapped_range = VkMappedMemoryRange::new(memory, offset, size);
             vkInvalidateMappedMemoryRanges(device.handle(), 1, &mapped_range);
             ptr::copy_nonoverlapping(mapped as *mut u8, destination as *mut u8, size as usize);
             vkUnmapMemory(device.handle(), memory);

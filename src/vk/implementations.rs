@@ -179,10 +179,10 @@ impl VkCommandBufferBeginInfo {
 }
 
 impl VkBufferCopy {
-    pub fn new(size: VkDeviceSize) -> Self {
+    pub fn new(offset: VkDeviceSize, size: VkDeviceSize) -> Self {
         VkBufferCopy {
-            srcOffset: 0,
-            dstOffset: 0,
+            srcOffset: offset,
+            dstOffset: offset,
             size: size,
         }
     }
@@ -426,6 +426,7 @@ impl VkBufferMemoryBarrier {
         src_access_mask: VkAccessFlags, 
         dst_access_mask: VkAccessFlags,
         buffer: VkBuffer,
+        offset: VkDeviceSize,
         size: VkDeviceSize,
     ) -> Self {
         VkBufferMemoryBarrier {
@@ -436,7 +437,7 @@ impl VkBufferMemoryBarrier {
             srcQueueFamilyIndex: VK_QUEUE_FAMILY_IGNORED,
             dstQueueFamilyIndex: VK_QUEUE_FAMILY_IGNORED,
             buffer: buffer,
-            offset: 0,
+            offset: offset,
             size: size,
         }
     }

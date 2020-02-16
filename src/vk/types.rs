@@ -699,6 +699,7 @@ pub struct VkCommandBufferBeginInfo {
 
 // @see https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/VkBufferCopy.html
 #[repr(C)]
+#[derive(Copy, Clone)]
 pub struct VkBufferCopy {
     pub srcOffset: VkDeviceSize,
     pub dstOffset: VkDeviceSize,
