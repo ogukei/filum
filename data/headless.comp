@@ -1,23 +1,18 @@
 #version 450
 
+layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
+layout(constant_id = 0) const uint BUFFER_ELEMENTS = 0;
 layout(binding = 0) buffer Binding {
-   uint fa[];
-};
-
-layout(binding = 1) buffer Fuga {
    uint values[];
 };
 
-layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
-layout(constant_id = 0) const uint BUFFER_ELEMENTS = 32;
-
 uint fibonacci(uint n) {
-	if(n <= 1){
+	if (n <= 1) {
 		return n;
 	}
 	uint curr = 1;
 	uint prev = 1;
-	for(uint i = 2; i < n; ++i) {
+	for (uint i = 2; i < n; ++i) {
 		uint temp = curr;
 		curr += prev;
 		prev = temp;
@@ -31,4 +26,3 @@ void main() {
 		return;	
 	values[index] = fibonacci(values[index]);
 }
-

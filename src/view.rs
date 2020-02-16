@@ -241,7 +241,30 @@ impl<T0, T1, T2, T3> BufferView<BufferLayout<T0, BindingVariant<T1>, T2, T3>> {
     }
 }
 
-pub struct BufferBindingView<VariantType> {
+impl<T0, T1, T2, T3> BufferView<BufferLayout<T0, BindingVariant<T1>, BindingVariant<T2>, T3>> {
+    pub fn third_binding(&self) -> Arc<BufferBindingView<T2>> {
+        BufferBindingView::new(2, &self.buffer)
+    }
+}
+
+impl<T0, T1, T2, T3> BufferView<BufferLayout<T0, BindingVariant<T1>, BindingVariant<T2>, BindingVariant<T3>>> {
+    pub fn fourth_binding(&self) -> Arc<BufferBindingView<T3>> {
+        BufferBindingView::new(3, &self.buffer)
+    }
+}
+
+impl<LayoutType> BufferView<BufferLayout<LayoutType>> {
+    pub fn nth_binding(&self, index: usize) -> Option<Arc<BufferBindingView>> {
+        let buffer = &self.buffer;
+        if index < buffer.region_count() {
+            Some(BufferBindingView::new(index, buffer))
+        } else {
+            None
+        }
+    }
+}
+
+pub struct BufferBindingView<VariantType = ()> {
     data: PhantomData<VariantType>,
     region_index: usize,
     buffer: Arc<Buffer>,
@@ -277,6 +300,18 @@ impl<ValueType> BufferBindingView<BindingValue<ValueType>> {
     }
 
     pub fn fetch_value(&self, value: &mut ValueType) {
+        let staging_buffer = self.buffer.staging_buffer();
+        staging_buffer.read_region(self.region_index, value);
+    }
+}
+
+impl BufferBindingView<()> {
+    pub fn update<DataType: ?Sized>(&self, value: &DataType) {
+        let staging_buffer = self.buffer.staging_buffer();
+        staging_buffer.write_region(self.region_index, value);
+    }
+
+    pub fn fetch<DataType: ?Sized>(&self, value: &mut DataType) {
         let staging_buffer = self.buffer.staging_buffer();
         staging_buffer.read_region(self.region_index, value);
     }

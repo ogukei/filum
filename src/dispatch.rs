@@ -21,7 +21,7 @@ pub struct CommandDispatch {
 }
 
 impl CommandDispatch {
-    pub fn new(compute_pipeline: &Arc<ComputePipeline>, workgroup_count: WorkgroupCount) -> Arc<Self> {
+    pub fn new(compute_pipeline: &Arc<ComputePipeline>, workgroup_count: WorkgroupCount, push_constants: Vec<ConstantEntry>) -> Arc<Self> {
         let staging_buffer = compute_pipeline.staging_buffer();
         let command_pool = staging_buffer.command_pool();
         let device = command_pool.device();
@@ -63,6 +63,19 @@ impl CommandDispatch {
                     0, ptr::null(),
                     1, &buffer_barrier,
                     0, ptr::null(),
+                );
+            }
+            if !push_constants.is_empty() {
+                let data = push_constants.iter()
+                    .flat_map(|entry| entry.bytes.iter().cloned())
+                    .collect::<Vec<u8>>();
+                vkCmdPushConstants(
+                    command_buffer,
+                    compute_pipeline.layout,
+                    VkShaderStageFlagBits::VK_SHADER_STAGE_COMPUTE_BIT as u32,
+                    0,
+                    data.len() as u32,
+                    data.as_ptr() as *const c_void,
                 );
             }
             vkCmdBindPipeline(
@@ -151,6 +164,17 @@ pub struct WorkgroupCount {
     pub z: u32,
 }
 
+pub struct ConstantEntry {
+    size: usize,
+    bytes: Vec<u8>,
+}
+
+impl ConstantEntry {
+    pub fn new(bytes: Vec<u8>) -> Self {
+        ConstantEntry { size: bytes.len(), bytes }
+    }
+}
+
 pub struct ComputePipeline {
     handle: VkPipeline,
     cache: VkPipelineCache,
@@ -163,7 +187,9 @@ pub struct ComputePipeline {
 }
 
 impl ComputePipeline {
-    pub fn new(staging_buffer: &Arc<StagingBuffer>, shader_module: &Arc<ShaderModule>) -> Arc<Self> {
+    pub fn new(staging_buffer: &Arc<StagingBuffer>, 
+        shader_module: &Arc<ShaderModule>, 
+        spec_constants: Vec<ConstantEntry>) -> Arc<Self> {
         let command_pool = staging_buffer.command_pool();
         let device = command_pool.device();
         let regions = staging_buffer.regions();
@@ -243,17 +269,26 @@ impl ComputePipeline {
             let pipeline_cache = pipeline_cache.assume_init();
             let mut compute_pipeline = MaybeUninit::<VkPipeline>::zeroed();
             {
-                #[repr(C)]
-                struct SpecializationData {
-                    element_count: u32,
-                }
-                let data = SpecializationData { element_count: 6 };
-                let entry = VkSpecializationMapEntry::new(0, 0, mem::size_of::<u32>());
+                let data = spec_constants.iter()
+                    .flat_map(|entry| entry.bytes.iter().cloned())
+                    .collect::<Vec<u8>>();
+                let entries = spec_constants.iter()
+                    .enumerate()
+                    .scan(0usize, |state, (index, entry)| {
+                        let offset = *state;
+                        let entry = VkSpecializationMapEntry::new(
+                            index as u32, 
+                            offset as u32,
+                            entry.size);
+                        *state += entry.size;
+                        Some(entry)
+                    })
+                    .collect::<Vec<VkSpecializationMapEntry>>();
                 let spec_info = VkSpecializationInfo::new(
-                    1,
-                    &entry,
-                    mem::size_of::<SpecializationData>(),
-                    &data as *const _ as *const c_void
+                    entries.len() as u32,
+                    entries.as_ptr(),
+                    data.len(),
+                    data.as_ptr() as *const c_void
                 );
                 let name = CString::new("main").unwrap();
                 let stage = VkPipelineShaderStageCreateInfo::new(

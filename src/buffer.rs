@@ -10,6 +10,7 @@ use std::marker::PhantomData;
 pub struct Buffer {
     context: Arc<Context>,
     staging_buffer: Arc<StagingBuffer>,
+    region_count: usize,
 }
 
 impl Buffer {
@@ -19,6 +20,7 @@ impl Buffer {
         let buffer = Buffer {
             context: Arc::clone(context),
             staging_buffer: staging_buffer,
+            region_count: region_sizes.len(),
         };
         Arc::new(buffer)
     }
@@ -31,5 +33,10 @@ impl Buffer {
     #[inline]
     pub(crate) fn staging_buffer(&self) -> &Arc<StagingBuffer> {
         &self.staging_buffer
+    }
+    
+    #[inline]
+    pub(crate) fn region_count(&self) -> usize {
+        self.region_count
     }
 }

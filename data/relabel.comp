@@ -1,16 +1,10 @@
 #version 450
 
+layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
 layout(binding = 0) buffer Binding { 
 	int values[];
 };
 
-layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
-layout(constant_id = 0) const uint BUFFER_ELEMENTS = 0;
-
-const uint WIDTH = 8;
-const uint HEIGHT = 8;
-
-#define INDEX(_x, _y) ((_y) * WIDTH + (_x))
 #define LABEL(_idx) values[_idx]
 
 int find_root(uint index) {
