@@ -65,7 +65,7 @@ fn union_find(table: Vec<i32>, dim: usize) {
         .shader("data/relabel.comp.spv")
         .build()
         .unwrap();
-    view.binding().update_array(&table);
+    view.binding().update_array_copying(&table);
 
     column.dispatch(dim);
 
@@ -83,7 +83,7 @@ fn union_find(table: Vec<i32>, dim: usize) {
         step_index += 1;
     }
     relabel.dispatch(len);
-    view.binding().fetch_array(&mut table);
+    view.binding().fetch_array_copying(&mut table);
     dump(&table);
 }
 
@@ -101,7 +101,7 @@ fn fibo(num_elements: usize) {
     
     let mut v = (0..num_elements as u32).collect::<Vec<_>>();
     let binding = view.binding();
-    binding.update_array(&v);
+    binding.update_array_copying(&v);
 
     let dispatch = DispatchBuilder::new(&pipeline)
         .workgroup_count(num_elements, 1, 1)
@@ -110,7 +110,7 @@ fn fibo(num_elements: usize) {
         .unwrap();
     dispatch.dispatch();
 
-    binding.fetch_array(&mut v);
+    binding.fetch_array_copying(&mut v);
 
     println!("{:?}", v)
 }

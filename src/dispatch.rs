@@ -361,7 +361,8 @@ impl StagingBuffer {
             device,
             VkBufferUsageFlagBits::VK_BUFFER_USAGE_TRANSFER_SRC_BIT as u32 | 
                 VkBufferUsageFlagBits::VK_BUFFER_USAGE_TRANSFER_DST_BIT as u32, 
-            VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT as u32,
+            VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT as u32 |
+                VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_CACHED_BIT as u32,
             buffer_size,
             ptr::null_mut()).unwrap();
         // device buffer
@@ -393,26 +394,47 @@ impl StagingBuffer {
         Arc::new(staging_buffer)
     }
 
-    pub fn write_region<DataType: ?Sized>(&self, region_index: usize, data: &DataType) {
+    pub fn write_region_slice<ItemType>(&self, region_index: usize, access: impl FnOnce(&mut [ItemType])) {
         let region = self.nth_region(region_index)
-            .unwrap();
-        assert_eq!(std::mem::size_of_val(data), region.size() as usize);
-        self.host_buffer_memory.write_memory(
-            data as *const _ as *const c_void,
-            region.offset(), 
-            region.size());
+        .unwrap();
+        unsafe {
+            self.host_buffer_memory.write_memory(region.offset(), region.size(), access);
+        }
         region.transfer_host_to_device();
     }
 
-    pub fn read_region<DataType: ?Sized>(&self, region_index: usize, data: &mut DataType) {
+    pub fn write_region_copying<DataType: ?Sized>(&self, region_index: usize, data: &DataType) {
+        let region = self.nth_region(region_index)
+            .unwrap();
+        assert_eq!(std::mem::size_of_val(data), region.size() as usize);
+        unsafe {
+            let region_size = region.size();
+            self.host_buffer_memory.write_memory(region.offset(), region_size, |slice: &mut [u8]| {
+                // transfer bytes to host memory buffer
+                std::ptr::copy_nonoverlapping(
+                    data as *const _ as *const u8, 
+                    slice.as_mut_ptr(), 
+                    region_size as usize);
+            });
+        }
+        region.transfer_host_to_device();
+    }
+
+    pub fn read_region_copying<DataType: ?Sized>(&self, region_index: usize, data: &mut DataType) {
         let region = self.nth_region(region_index)
             .unwrap();
         assert_eq!(std::mem::size_of_val(data), region.size() as usize);
         region.transfer_device_to_host();
-        self.host_buffer_memory.read_memory(
-            data as *mut _ as *mut c_void,
-            region.offset(), 
-            region.size());
+        unsafe {
+            let region_size = region.size();
+            self.host_buffer_memory.read_memory(region.offset(), region_size, |slice: &[u8]| {
+                // transfer bytes from host memory buffer
+                std::ptr::copy_nonoverlapping(
+                    slice.as_ptr(),
+                    data as *mut _ as *mut u8,
+                    region_size as usize);
+            });
+        }
     }
 
     #[inline]

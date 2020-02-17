@@ -282,37 +282,37 @@ impl<VariantType> BufferBindingView<VariantType> {
 }
 
 impl<ItemType> BufferBindingView<BindingArray<ItemType>> {
-    pub fn update_array(&self, array: &[ItemType]) {
+    pub fn update_array_copying(&self, array: &[ItemType]) {
         let staging_buffer = self.buffer.staging_buffer();
-        staging_buffer.write_region(self.region_index, array);
+        staging_buffer.write_region_copying(self.region_index, array);
     }
 
-    pub fn fetch_array(&self, array: &mut [ItemType]) {
+    pub fn fetch_array_copying(&self, array: &mut [ItemType]) {
         let staging_buffer = self.buffer.staging_buffer();
-        staging_buffer.read_region(self.region_index, array);
+        staging_buffer.read_region_copying(self.region_index, array);
     }
 }
 
 impl<ValueType> BufferBindingView<BindingValue<ValueType>> {
-    pub fn update_value(&self, value: &ValueType) {
+    pub fn update_value_copying(&self, value: &ValueType) {
         let staging_buffer = self.buffer.staging_buffer();
-        staging_buffer.write_region(self.region_index, value);
+        staging_buffer.write_region_copying(self.region_index, value);
     }
 
-    pub fn fetch_value(&self, value: &mut ValueType) {
+    pub fn fetch_value_copying(&self, value: &mut ValueType) {
         let staging_buffer = self.buffer.staging_buffer();
-        staging_buffer.read_region(self.region_index, value);
+        staging_buffer.read_region_copying(self.region_index, value);
     }
 }
 
 impl BufferBindingView<()> {
     pub fn update<DataType: ?Sized>(&self, value: &DataType) {
         let staging_buffer = self.buffer.staging_buffer();
-        staging_buffer.write_region(self.region_index, value);
+        staging_buffer.write_region_copying(self.region_index, value);
     }
 
     pub fn fetch<DataType: ?Sized>(&self, value: &mut DataType) {
         let staging_buffer = self.buffer.staging_buffer();
-        staging_buffer.read_region(self.region_index, value);
+        staging_buffer.read_region_copying(self.region_index, value);
     }
 }
