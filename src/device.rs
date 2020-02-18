@@ -56,8 +56,7 @@ impl BufferMemory {
     pub fn new(device: &Arc<Device>, 
         usage: VkBufferUsageFlags, 
         memory_property_flags: VkMemoryPropertyFlags, 
-        size: VkDeviceSize,
-        data: *mut c_void) -> Result<Arc<Self>> {
+        size: VkDeviceSize) -> Result<Arc<Self>> {
         unsafe {
             // creates buffer
             let mut buffer = MaybeUninit::<VkBuffer>::zeroed();
@@ -91,16 +90,6 @@ impl BufferMemory {
                 .into_result()
                 .unwrap();
             let memory = memory.assume_init();
-            // maps memory if needed
-            if data != ptr::null_mut() {
-                let mut mapped = MaybeUninit::<*mut c_void>::zeroed();
-                vkMapMemory(device.handle(), memory, 0, size, 0, mapped.as_mut_ptr())
-                    .into_result()
-                    .unwrap();
-                let mapped = mapped.assume_init();
-                ptr::copy_nonoverlapping(data as *mut u8, mapped as *mut u8, size as usize);
-                vkUnmapMemory(device.handle(), memory);
-            }
             // binding
             vkBindBufferMemory(device.handle(), buffer, memory, 0)
                 .into_result()

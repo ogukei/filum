@@ -363,8 +363,7 @@ impl StagingBuffer {
                 VkBufferUsageFlagBits::VK_BUFFER_USAGE_TRANSFER_DST_BIT as u32, 
             VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT as u32 |
                 VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_CACHED_BIT as u32,
-            buffer_size,
-            ptr::null_mut()).unwrap();
+            buffer_size).unwrap();
         // device buffer
         let device_buffer_memory = BufferMemory::new(
             device,
@@ -372,8 +371,7 @@ impl StagingBuffer {
                 VkBufferUsageFlagBits::VK_BUFFER_USAGE_TRANSFER_DST_BIT as u32 |
                 VkBufferUsageFlagBits::VK_BUFFER_USAGE_STORAGE_BUFFER_BIT as u32,
             VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT as u32,
-            buffer_size,
-            ptr::null_mut()).unwrap();
+            buffer_size).unwrap();
         // regions
         let regions = region_sizes.iter()
             .map(|v| *v as VkDeviceSize)
@@ -394,7 +392,7 @@ impl StagingBuffer {
         Arc::new(staging_buffer)
     }
 
-    pub fn write_region_slice<ItemType>(&self, region_index: usize, access: impl FnOnce(&mut [ItemType])) {
+    pub fn write_region_with_slice<ItemType>(&self, region_index: usize, access: impl FnOnce(&mut [ItemType])) {
         let region = self.nth_region(region_index)
         .unwrap();
         unsafe {
@@ -418,6 +416,15 @@ impl StagingBuffer {
             });
         }
         region.transfer_host_to_device();
+    }
+
+    pub fn read_region_with_slice<ItemType>(&self, region_index: usize, access: impl FnOnce(&[ItemType])) {
+        let region = self.nth_region(region_index)
+            .unwrap();
+        region.transfer_device_to_host();
+        unsafe {
+            self.host_buffer_memory.read_memory(region.offset(), region.size(), access);
+        }
     }
 
     pub fn read_region_copying<DataType: ?Sized>(&self, region_index: usize, data: &mut DataType) {

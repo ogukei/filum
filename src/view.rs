@@ -282,6 +282,11 @@ impl<VariantType> BufferBindingView<VariantType> {
 }
 
 impl<ItemType> BufferBindingView<BindingArray<ItemType>> {
+    pub fn update_array_inplace(&self, access: impl FnOnce(&mut [ItemType])) {
+        let staging_buffer = self.buffer.staging_buffer();
+        staging_buffer.write_region_with_slice(self.region_index, access);
+    }
+
     pub fn update_array_copying(&self, array: &[ItemType]) {
         let staging_buffer = self.buffer.staging_buffer();
         staging_buffer.write_region_copying(self.region_index, array);
@@ -290,6 +295,11 @@ impl<ItemType> BufferBindingView<BindingArray<ItemType>> {
     pub fn fetch_array_copying(&self, array: &mut [ItemType]) {
         let staging_buffer = self.buffer.staging_buffer();
         staging_buffer.read_region_copying(self.region_index, array);
+    }
+
+    pub fn fetch_array_inplace(&self, access: impl FnOnce(&[ItemType])) {
+        let staging_buffer = self.buffer.staging_buffer();
+        staging_buffer.read_region_with_slice(self.region_index, access);
     }
 }
 
