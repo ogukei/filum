@@ -281,48 +281,38 @@ impl<VariantType> BufferBindingView<VariantType> {
     }
 }
 
-impl<ItemType> BufferBindingView<BindingArray<ItemType>> {
-    pub fn update_array_inplace(&self, access: impl FnOnce(&mut [ItemType])) {
-        let staging_buffer = self.buffer.staging_buffer();
-        staging_buffer.write_region_with_slice(self.region_index, access);
-    }
-
+impl<ItemType> BufferBindingView<BindingArray<ItemType>> where ItemType: Copy {
     pub fn update_array_copying(&self, array: &[ItemType]) {
         let staging_buffer = self.buffer.staging_buffer();
-        staging_buffer.write_region_copying(self.region_index, array);
+        staging_buffer.write_region_with_slice(self.region_index, |slice: &mut [ItemType]| {
+            slice.copy_from_slice(array);
+        });
     }
 
     pub fn fetch_array_copying(&self, array: &mut [ItemType]) {
         let staging_buffer = self.buffer.staging_buffer();
-        staging_buffer.read_region_copying(self.region_index, array);
+        staging_buffer.read_region_with_slice(self.region_index, |slice: &[ItemType]| {
+            array.copy_from_slice(slice);
+        });
+    }
+}
+
+impl<ItemType> BufferBindingView<BindingArray<ItemType>> {
+    pub fn update_array(&self, access: impl FnOnce(&mut [ItemType])) {
+        let staging_buffer = self.buffer.staging_buffer();
+        staging_buffer.write_region_with_slice(self.region_index, access);
     }
 
-    pub fn fetch_array_inplace(&self, access: impl FnOnce(&[ItemType])) {
+    pub fn fetch_array(&self, access: impl FnOnce(&[ItemType])) {
         let staging_buffer = self.buffer.staging_buffer();
         staging_buffer.read_region_with_slice(self.region_index, access);
     }
 }
 
 impl<ValueType> BufferBindingView<BindingValue<ValueType>> {
-    pub fn update_value_copying(&self, value: &ValueType) {
-        let staging_buffer = self.buffer.staging_buffer();
-        staging_buffer.write_region_copying(self.region_index, value);
-    }
-
-    pub fn fetch_value_copying(&self, value: &mut ValueType) {
-        let staging_buffer = self.buffer.staging_buffer();
-        staging_buffer.read_region_copying(self.region_index, value);
-    }
+    // TODO:
 }
 
 impl BufferBindingView<()> {
-    pub fn update<DataType: ?Sized>(&self, value: &DataType) {
-        let staging_buffer = self.buffer.staging_buffer();
-        staging_buffer.write_region_copying(self.region_index, value);
-    }
-
-    pub fn fetch<DataType: ?Sized>(&self, value: &mut DataType) {
-        let staging_buffer = self.buffer.staging_buffer();
-        staging_buffer.read_region_copying(self.region_index, value);
-    }
+    // TODO:
 }

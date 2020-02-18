@@ -344,15 +344,18 @@ impl Drop for ComputePipeline {
 
 pub struct StagingBuffer {
     buffer_size: VkDeviceSize,
-    regions: Vec<Arc<StagingBufferRegion>>,
+    regions: Vec<StagingBufferRegion>,
     host_buffer_memory: Arc<BufferMemory>,
     device_buffer_memory: Arc<BufferMemory>,
     command_pool: Arc<CommandPool>,
+    mapped: *mut c_void,
 }
 
 impl StagingBuffer {
     pub fn new(command_pool: &Arc<CommandPool>, region_sizes: &[usize]) -> Arc<Self> {
         let device = command_pool.device();
+        // TODO:
+        // VkPhysicalDeviceLimits::nonCoherentAtomSize
         let buffer_size = region_sizes.iter()
             .map(|v| *v as VkDeviceSize)
             .sum();
@@ -372,12 +375,25 @@ impl StagingBuffer {
                 VkBufferUsageFlagBits::VK_BUFFER_USAGE_STORAGE_BUFFER_BIT as u32,
             VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT as u32,
             buffer_size).unwrap();
+        // mapping
+        let mapped: *mut c_void;
+        unsafe {
+            let mut maybe_mapped = MaybeUninit::<*mut c_void>::zeroed();
+            vkMapMemory(device.handle(), host_buffer_memory.memory(), 0, buffer_size, 0, maybe_mapped.as_mut_ptr())
+                .into_result()
+                .unwrap();
+            mapped = maybe_mapped.assume_init();
+        }
         // regions
         let regions = region_sizes.iter()
             .map(|v| *v as VkDeviceSize)
             .scan(0 as VkDeviceSize, |state, size| {
                 let offset = *state;
-                let region = StagingBufferRegion::new(offset, size, command_pool, &host_buffer_memory, &device_buffer_memory);
+                let region = StagingBufferRegion::new(offset, size, 
+                    command_pool, 
+                    &host_buffer_memory, 
+                    &device_buffer_memory,
+                    mapped);
                 *state += size;
                 Some(region)
             })
@@ -388,6 +404,7 @@ impl StagingBuffer {
             host_buffer_memory: host_buffer_memory,
             device_buffer_memory: device_buffer_memory,
             command_pool: Arc::clone(command_pool),
+            mapped: mapped,
         };
         Arc::new(staging_buffer)
     }
@@ -396,25 +413,19 @@ impl StagingBuffer {
         let region = self.nth_region(region_index)
         .unwrap();
         unsafe {
-            self.host_buffer_memory.write_memory(region.offset(), region.size(), access);
+            access(region.as_mut_slice::<ItemType>());
         }
+        region.flush_mapped_memory_range();
         region.transfer_host_to_device();
     }
 
-    pub fn write_region_copying<DataType: ?Sized>(&self, region_index: usize, data: &DataType) {
+    pub fn write_region<DataType>(&self, region_index: usize, access: impl FnOnce(&mut DataType)) {
         let region = self.nth_region(region_index)
             .unwrap();
-        assert_eq!(std::mem::size_of_val(data), region.size() as usize);
         unsafe {
-            let region_size = region.size();
-            self.host_buffer_memory.write_memory(region.offset(), region_size, |slice: &mut [u8]| {
-                // transfer bytes to host memory buffer
-                std::ptr::copy_nonoverlapping(
-                    data as *const _ as *const u8, 
-                    slice.as_mut_ptr(), 
-                    region_size as usize);
-            });
+            access(region.as_mut());
         }
+        region.flush_mapped_memory_range();
         region.transfer_host_to_device();
     }
 
@@ -422,25 +433,19 @@ impl StagingBuffer {
         let region = self.nth_region(region_index)
             .unwrap();
         region.transfer_device_to_host();
+        region.invalidate_mapped_memory_range();
         unsafe {
-            self.host_buffer_memory.read_memory(region.offset(), region.size(), access);
+            access(region.as_slice::<ItemType>());
         }
     }
 
-    pub fn read_region_copying<DataType: ?Sized>(&self, region_index: usize, data: &mut DataType) {
+    pub fn read_region<DataType>(&self, region_index: usize, access: impl FnOnce(&DataType)) {
         let region = self.nth_region(region_index)
             .unwrap();
-        assert_eq!(std::mem::size_of_val(data), region.size() as usize);
         region.transfer_device_to_host();
+        region.invalidate_mapped_memory_range();
         unsafe {
-            let region_size = region.size();
-            self.host_buffer_memory.read_memory(region.offset(), region_size, |slice: &[u8]| {
-                // transfer bytes from host memory buffer
-                std::ptr::copy_nonoverlapping(
-                    slice.as_ptr(),
-                    data as *mut _ as *mut u8,
-                    region_size as usize);
-            });
+            access(region.as_ref::<DataType>());
         }
     }
 
@@ -460,12 +465,12 @@ impl StagingBuffer {
     }
 
     #[inline]
-    fn nth_region(&self, index: usize) -> Option<&Arc<StagingBufferRegion>> {
+    fn nth_region(&self, index: usize) -> Option<&StagingBufferRegion> {
         self.regions.get(index)
     }
 
     #[inline]
-    fn regions(&self) -> &Vec<Arc<StagingBufferRegion>> {
+    fn regions(&self) -> &Vec<StagingBufferRegion> {
         &self.regions
     }
 }
@@ -473,6 +478,11 @@ impl StagingBuffer {
 impl Drop for StagingBuffer {
     fn drop(&mut self) {
         log_debug!("Drop StagingBuffer");
+        let device = self.command_pool.device();
+        let host_buffer_memory = self.host_buffer_memory();
+        unsafe {
+            vkUnmapMemory(device.handle(), host_buffer_memory.memory());
+        }
     }
 }
 
@@ -485,15 +495,19 @@ pub struct StagingBufferRegion {
     device_to_host_command: VkCommandBuffer,
     host_to_device_fence: VkFence,
     device_to_host_fence: VkFence,
+    region_ptr: *mut u8,
 }
 
 impl StagingBufferRegion {
+    // depends on staging buffer as long as its host buffer is mapped
+    // so that new() returns StagingBufferRegion instead of Arc<StagingBufferRegion>
     pub fn new(
         offset: VkDeviceSize, 
         size: VkDeviceSize,
         command_pool: &Arc<CommandPool>,
         host_buffer_memory: &Arc<BufferMemory>,
-        device_buffer_memory: &Arc<BufferMemory>) -> Arc<Self> {
+        device_buffer_memory: &Arc<BufferMemory>,
+        mapped: *mut c_void) -> StagingBufferRegion {
         let copy_region = VkBufferCopy::new(offset, size);
         let device = command_pool.device();
         unsafe {
@@ -583,8 +597,9 @@ impl StagingBufferRegion {
                 device_to_host_command,
                 host_to_device_fence: host_to_device_fence.assume_init(),
                 device_to_host_fence: device_to_host_fence.assume_init(),
+                region_ptr: (mapped as *mut u8).offset(offset as isize),
             };
-            Arc::new(region)
+            region
         }
     }
 
@@ -622,6 +637,28 @@ impl StagingBufferRegion {
         }
     }
 
+    fn invalidate_mapped_memory_range(&self) {
+        let device = self.host_buffer_memory.device();
+        let memory = self.host_buffer_memory.memory();
+        let mapped_range = VkMappedMemoryRange::new(memory, self.offset(), self.size());
+        unsafe {
+            vkInvalidateMappedMemoryRanges(device.handle(), 1, &mapped_range)
+                .into_result()
+                .unwrap();
+        }
+    }
+
+    fn flush_mapped_memory_range(&self) {
+        let device = self.host_buffer_memory.device();
+        let memory = self.host_buffer_memory.memory();
+        let mapped_range = VkMappedMemoryRange::new(memory, self.offset(), self.size());
+        unsafe {
+            vkFlushMappedMemoryRanges(device.handle(), 1, &mapped_range)
+                .into_result()
+                .unwrap();
+        }
+    }
+
     #[inline]
     pub fn offset(&self) -> VkDeviceSize {
         self.copy_region.srcOffset
@@ -635,6 +672,30 @@ impl StagingBufferRegion {
     #[inline]
     pub fn copy_region(&self) -> VkBufferCopy {
         self.copy_region
+    }
+
+    #[inline]
+    unsafe fn as_slice<'a, ValueType>(&'a self) -> &'a [ValueType] {
+        let value_size = std::mem::size_of::<ValueType>();
+        let length = self.size() as usize / value_size;
+        std::slice::from_raw_parts(self.region_ptr as *const ValueType, length)
+    }
+
+    #[inline]
+    unsafe fn as_ref<'a, ValueType>(&'a self) -> &'a ValueType {
+        (self.region_ptr as *const ValueType).as_ref().unwrap()
+    }
+
+    #[inline]
+    unsafe fn as_mut_slice<'a, ValueType>(&'a self) -> &'a mut [ValueType] {
+        let value_size = std::mem::size_of::<ValueType>();
+        let length = self.size() as usize / value_size;
+        std::slice::from_raw_parts_mut(self.region_ptr as *mut ValueType, length)
+    }
+
+    #[inline]
+    unsafe fn as_mut<'a, ValueType>(&'a self) -> &'a mut ValueType {
+        (self.region_ptr as *mut ValueType).as_mut().unwrap()
     }
 }
 

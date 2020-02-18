@@ -118,58 +118,6 @@ impl BufferMemory {
     pub fn device(&self) -> &Arc<Device> {
         &self.device
     }
-
-    pub unsafe fn write_memory<ItemType>(&self, offset: VkDeviceSize, size: VkDeviceSize, 
-        access: impl FnOnce(&mut [ItemType])) {
-        let device: &Device = &self.device;
-        let memory = self.memory;
-        let mut mapped = MaybeUninit::<*mut c_void>::zeroed();
-        vkMapMemory(device.handle(), memory, offset, size, 0, mapped.as_mut_ptr())
-            .into_result()
-            .unwrap();
-        let mapped = mapped.assume_init();
-        {
-            let size = size as usize;
-            let item_size = std::mem::size_of::<ItemType>();
-            assert_ne!(item_size, 0);
-            assert_eq!(size % item_size, 0);
-            let length = size / item_size;
-            let mapped_slice = std::slice::from_raw_parts_mut(mapped as *mut ItemType, length);
-            access(mapped_slice);
-        }
-        let mapped_memory_range = VkMappedMemoryRange::new(memory, offset, size);
-        vkFlushMappedMemoryRanges(device.handle(), 1, &mapped_memory_range)
-            .into_result()
-            .unwrap();
-        vkUnmapMemory(device.handle(), memory);
-    }
-
-    pub unsafe fn read_memory<ItemType>(&self, offset: VkDeviceSize, 
-        size: VkDeviceSize, 
-        access: impl FnOnce(&[ItemType])) {
-        let device: &Device = &self.device;
-        let memory = self.memory;
-        // Make device writes visible to the host
-        let mut mapped = MaybeUninit::<*mut c_void>::zeroed();
-        vkMapMemory(device.handle(), memory, offset, size, 0, mapped.as_mut_ptr())
-            .into_result()
-            .unwrap();
-        let mapped = mapped.assume_init();
-        {
-            let size = size as usize;
-            let item_size = std::mem::size_of::<ItemType>();
-            assert_ne!(item_size, 0);
-            assert_eq!(size % item_size, 0);
-            let length = size / item_size;
-            let mapped_slice = std::slice::from_raw_parts(mapped as *mut ItemType, length);
-            access(mapped_slice);
-        }
-        let mapped_range = VkMappedMemoryRange::new(memory, offset, size);
-        vkInvalidateMappedMemoryRanges(device.handle(), 1, &mapped_range)
-            .into_result()
-            .unwrap();
-        vkUnmapMemory(device.handle(), memory);
-    }
 }
 
 impl Drop for BufferMemory {
