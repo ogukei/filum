@@ -29,6 +29,9 @@ binding.update_array_copying(&v);
 pipeline.dispatch(num_elements);
 // receive data from GPU device
 binding.fetch_array_copying(&mut v);
+
+// outputs
+// [0, 1, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144, 233, 377, 610, 987, 1597, 2584, 4181, 6765, 10946, 17711, 28657, 46368, 75025, 121393, 196418, 317811, 514229, 832040, 1346269]
  ```
  
  ## Features
@@ -107,11 +110,27 @@ column.dispatch(dim.0);
 // relabel
 relabel.dispatch(len);
 binding.fetch_array_copying(&mut table);
+
+// outputs
+/*
+ -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1, 
+ -1,   9,   9,  -1,  12,  12,  12,  -1, 
+ -1,   9,   9,  -1,  12,  12,  12,  -1, 
+  9,   9,   9,  -1,  -1,  -1,  -1,  31, 
+ -1,   9,   9,   9,  -1,  -1,  -1,  31, 
+ -1,  -1,  -1,  -1,  -1,  45,  45,  -1, 
+ -1,  45,  -1,  45,  45,  45,  45,  -1, 
+ -1,  45,  45,  45,  -1,  -1,  -1,  -1,
+*/
 ```
 
 ## Performance
 Connected component labeling 8K Image
 
-GPU computation took `~210ms` including memory transfer operations.
+GPU computation took `~210ms` including memory transfer operations. 
+
+* OS: Ubuntu 18.04
+* CPU: Intel(R) Core(TM) i7-3930K CPU @ 3.20GHz
+* GPU: NVIDIA GeForce RTX 2070
 
 ![image](https://gist.githubusercontent.com/ogukei/8fbe74217d57a63d46be9e4bb4cae021/raw/0c972f2d8bc70168530828ecbda24ef7173888ce/ccl.png)
