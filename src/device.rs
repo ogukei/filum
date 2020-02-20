@@ -6,7 +6,6 @@ use super::instance::{Instance, QueueFamily, PhysicalDevice, PhysicalDevicesBuil
 
 use std::ptr;
 use std::mem;
-use std::ffi::{CStr, CString};
 use std::mem::MaybeUninit;
 use libc::{c_float, c_void};
 use std::sync::Arc;
@@ -49,15 +48,14 @@ pub struct BufferMemory {
     buffer: VkBuffer,
     memory: VkDeviceMemory,
     device: Arc<Device>,
-    size: VkDeviceSize,
+    whole_size: VkDeviceSize,
 }
 
 impl BufferMemory {
     pub fn new(device: &Arc<Device>, 
         usage: VkBufferUsageFlags, 
         memory_property_flags: VkMemoryPropertyFlags, 
-        size: VkDeviceSize,
-        data: *mut c_void) -> Result<Arc<Self>> {
+        size: VkDeviceSize) -> Result<Arc<Self>> {
         unsafe {
             // creates buffer
             let mut buffer = MaybeUninit::<VkBuffer>::zeroed();
@@ -91,16 +89,6 @@ impl BufferMemory {
                 .into_result()
                 .unwrap();
             let memory = memory.assume_init();
-            // maps memory if needed
-            if data != ptr::null_mut() {
-                let mut mapped = MaybeUninit::<*mut c_void>::zeroed();
-                vkMapMemory(device.handle(), memory, 0, size, 0, mapped.as_mut_ptr())
-                    .into_result()
-                    .unwrap();
-                let mapped = mapped.assume_init();
-                ptr::copy_nonoverlapping(data as *mut u8, mapped as *mut u8, size as usize);
-                vkUnmapMemory(device.handle(), memory);
-            }
             // binding
             vkBindBufferMemory(device.handle(), buffer, memory, 0)
                 .into_result()
@@ -109,7 +97,7 @@ impl BufferMemory {
                 buffer: buffer,
                 memory: memory,
                 device: Arc::clone(device),
-                size: size,
+                whole_size: size,
             };
             Ok(Arc::new(buffer_memory))
         }
@@ -125,39 +113,9 @@ impl BufferMemory {
         self.memory
     }
 
-    pub fn write_memory(&self, source: *mut c_void) {
-        unsafe {
-            let device: &Device = &self.device;
-            let memory = self.memory;
-            let size = self.size;
-            let mut mapped = MaybeUninit::<*mut c_void>::zeroed();
-            vkMapMemory(device.handle(), memory, 0, VK_WHOLE_SIZE, 0, mapped.as_mut_ptr())
-                .into_result()
-                .unwrap();
-            let mapped = mapped.assume_init();
-            ptr::copy_nonoverlapping(source as *mut u8, mapped as *mut u8, size as usize);
-            let mapped_memory_range = VkMappedMemoryRange::new(memory, 0, VK_WHOLE_SIZE);
-            vkFlushMappedMemoryRanges(device.handle(), 1, &mapped_memory_range)
-                .into_result()
-                .unwrap();
-            vkUnmapMemory(device.handle(), memory);
-        }
-    }
-
-    pub fn read_memory(&self, destination: *mut c_void) {
-        unsafe {
-            let device: &Device = &self.device;
-            let memory = self.memory;
-            let size = self.size;
-            // Make device writes visible to the host
-            let mut mapped = MaybeUninit::<*mut c_void>::zeroed();
-            vkMapMemory(device.handle(), memory, 0, VK_WHOLE_SIZE, 0, mapped.as_mut_ptr());
-            let mapped = mapped.assume_init();
-            let mapped_range = VkMappedMemoryRange::new(memory, 0, VK_WHOLE_SIZE);
-            vkInvalidateMappedMemoryRanges(device.handle(), 1, &mapped_range);
-            ptr::copy_nonoverlapping(mapped as *mut u8, destination as *mut u8, size as usize);
-            vkUnmapMemory(device.handle(), memory);
-        }
+    #[inline]
+    pub fn device(&self) -> &Arc<Device> {
+        &self.device
     }
 }
 
@@ -288,7 +246,7 @@ pub struct ShaderModule {
 }
 
 impl ShaderModule {
-    pub fn new<S: Into<String>>(device: &Arc<Device>, filename: S) -> std::io::Result<Arc<Self>> {
+    pub fn new(device: &Arc<Device>, filename: impl Into<String>) -> std::io::Result<Arc<Self>> {
         let mut file = std::fs::File::open(filename.into())?;
         let mut buffer = Vec::<u8>::new();
         let bytes = file.read_to_end(&mut buffer)?;
@@ -296,7 +254,7 @@ impl ShaderModule {
         assert_eq!(bytes % 4, 0);
         unsafe {
             let mut handle = MaybeUninit::<VkShaderModule>::zeroed();
-            let create_info = VkShaderModuleCreateInfo::new(bytes, std::mem::transmute(buffer.as_mut_ptr()));
+            let create_info = VkShaderModuleCreateInfo::new(bytes, buffer.as_mut_ptr() as *const u32);
             vkCreateShaderModule(device.handle, &create_info, ptr::null(), handle.as_mut_ptr())
                 .into_result()
                 .unwrap();

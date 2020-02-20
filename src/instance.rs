@@ -17,6 +17,7 @@ pub struct Instance {
 impl Instance {
     pub fn new() -> Result<Arc<Instance>> {
         let application_name = CString::new("stala")?;
+        // `stalactite` is the codename initially used for development
         let engine_name = CString::new("Stalactite Engine")?;
         let app_info = VkApplicationInfo::new(application_name.as_ptr(), 0, engine_name.as_ptr(), 0);
         let instance_info = VkInstanceCreateInfo::new(&app_info);

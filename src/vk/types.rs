@@ -699,6 +699,7 @@ pub struct VkCommandBufferBeginInfo {
 
 // @see https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/VkBufferCopy.html
 #[repr(C)]
+#[derive(Copy, Clone)]
 pub struct VkBufferCopy {
     pub srcOffset: VkDeviceSize,
     pub dstOffset: VkDeviceSize,
@@ -1320,6 +1321,15 @@ extern "C" {
         groupCountX: u32,
         groupCountY: u32,
         groupCountZ: u32,
+    );
+    // @see https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/vkCmdPushConstants.html
+    pub fn vkCmdPushConstants(
+        commandBuffer: VkCommandBuffer,
+        layout: VkPipelineLayout,
+        stageFlags: VkShaderStageFlags,
+        offset: u32,
+        size: u32,
+        pValues: *const c_void,
     );
     // @see http://khronos.org/registry/vulkan/specs/1.1-extensions/man/html/vkResetFences.html
     pub fn vkResetFences(

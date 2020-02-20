@@ -1,0 +1,28 @@
+#version 450
+
+layout(binding = 0) buffer Binding { 
+	int values[];
+};
+
+layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
+layout(constant_id = 0) const uint WIDTH = 8;
+layout(constant_id = 1) const uint HEIGHT = 8;
+
+#define INDEX(_x, _y) ((_y) * WIDTH + (_x))
+#define IS_CONNECTED(_idx) (values[_idx] >= 0)
+#define LABEL(_idx) (values[_idx])
+
+void traverse_column(uint x) {
+	for (uint y = 1; y < HEIGHT; ++y) {
+		uint i0 = INDEX(x, y-1);
+		uint i1 = INDEX(x, y);
+		if (IS_CONNECTED(i0) && IS_CONNECTED(i1)) {
+			LABEL(i1) = LABEL(i0);
+		}
+	}
+}
+
+void main() {
+	uint id = gl_GlobalInvocationID.x;
+	traverse_column(id);
+}

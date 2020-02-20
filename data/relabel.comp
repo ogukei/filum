@@ -1,0 +1,29 @@
+#version 450
+
+layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
+layout(binding = 0) buffer Binding { 
+	int values[];
+};
+
+#define LABEL(_idx) values[_idx]
+
+int find_root(uint index) {
+	int v = atomicAdd(LABEL(index), 0);
+	if (v < 0) {
+		return v;
+	}
+    int w = int(index);
+    while (v != w) {
+        w = v;
+        v = atomicAdd(LABEL(v), 0);
+    }
+	return v;
+}
+
+void main() {
+	uint id = gl_GlobalInvocationID.x;
+    int v = find_root(id);
+    if (v >= 0) {
+        atomicExchange(LABEL(id), v);
+	}
+}
