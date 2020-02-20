@@ -1,16 +1,21 @@
 
-#[cfg(debug_assertions)]
+#[cfg(feature = "verbose")]
 macro_rules! log_debug {
     () => { println!() };
-    ($($arg:tt)*) => { println!("[{}:{}] {}", file!(), line!(), format!($($arg)*)) };
+    ($($arg:tt)*) => { 
+        let s: &'static str = file!();
+        let filename = s.split('/').last().unwrap_or("");
+        let label = format!("{}:{}", filename, line!());
+        println!("[{:>18}] {}", label, format!($($arg)*)) 
+    };
 }
 
-#[cfg(not(debug_assertions))]
+#[cfg(not(feature = "verbose"))]
 macro_rules! log_debug {
     ($($arg:tt)*) => { () }
 }
 
 macro_rules! log_info {
     () => { println!() };
-    ($($arg:tt)*) => { println!("[{}] {}", "stala::log_info", format!($($arg)*)) };
+    ($($arg:tt)*) => { println!("[{}] {}", "filum", format!($($arg)*)) };
 }
