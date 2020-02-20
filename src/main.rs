@@ -47,25 +47,27 @@ fn union_find(table: Vec<i32>, dim: usize) {
     assert_eq!((dim & (dim - 1)), 0);
     
     let context = Context::new().unwrap();
-    let view = BufferViewBuilder::new(&context)
+    let buffer_view = BufferViewBuilder::new(&context)
         .bind_array::<i32>(len)
         .build()
         .unwrap();
-    let column = PipelineBuilder::new(view.buffer())
+    let buffer = buffer_view.buffer();
+    let column = PipelineBuilder::new(buffer)
         .shader("data/column.comp.spv")
         .specialization(constants!(dim as u32, dim as u32))
         .build()
         .unwrap();
-    let merge = PipelineBuilder::new(view.buffer())
+    let merge = PipelineBuilder::new(buffer)
         .shader("data/merge.comp.spv")
         .specialization(constants!(dim as u32, dim as u32))
         .build()
         .unwrap();
-    let relabel = PipelineBuilder::new(view.buffer())
+    let relabel = PipelineBuilder::new(buffer)
         .shader("data/relabel.comp.spv")
         .build()
         .unwrap();
-    view.binding().update_array_copying(&table);
+    let binding = buffer_view.binding();
+    binding.update_array_copying(&table);
 
     column.dispatch(dim);
 
@@ -83,7 +85,7 @@ fn union_find(table: Vec<i32>, dim: usize) {
         step_index += 1;
     }
     relabel.dispatch(len);
-    view.binding().fetch_array_copying(&mut table);
+    binding.fetch_array_copying(&mut table);
     dump(&table);
 }
 

@@ -243,7 +243,7 @@ impl ComputePipeline {
                         VkDescriptorBufferInfo::new(
                             staging_buffer.device_buffer_memory().buffer(), 
                             region.offset(), 
-                            region.size())
+                            region.allocation_size())
                     })
                     .collect::<Vec<VkDescriptorBufferInfo>>();
                 let write_sets = infos.iter()
@@ -354,10 +354,22 @@ pub struct StagingBuffer {
 impl StagingBuffer {
     pub fn new(command_pool: &Arc<CommandPool>, region_sizes: &[usize]) -> Arc<Self> {
         let device = command_pool.device();
-        // TODO:
-        // VkPhysicalDeviceLimits::nonCoherentAtomSize
+        // adjusts each region sizes considering allocation granularity size
+        let device_properties = device.physical_device().properties();
+        let atom_size = device_properties.limits.nonCoherentAtomSize as VkDeviceSize;
+        let region_sizes = region_sizes.iter()
+            .map(|&v| v as VkDeviceSize)
+            .map(|v| {
+                // rounding up to multiple of nonCoherentAtomSize
+                let alloc_size = ((v + atom_size - 1) / atom_size) * atom_size;
+                StagingBufferRegionSize {
+                    allocation_size: alloc_size,
+                    region_size: v,
+                }
+            })
+            .collect::<Vec<_>>();
         let buffer_size = region_sizes.iter()
-            .map(|v| *v as VkDeviceSize)
+            .map(|v| v.allocation_size)
             .sum();
         // host buffer
         let host_buffer_memory = BufferMemory::new(
@@ -385,8 +397,7 @@ impl StagingBuffer {
             mapped = maybe_mapped.assume_init();
         }
         // regions
-        let regions = region_sizes.iter()
-            .map(|v| *v as VkDeviceSize)
+        let regions = region_sizes.into_iter()
             .scan(0 as VkDeviceSize, |state, size| {
                 let offset = *state;
                 let region = StagingBufferRegion::new(offset, size, 
@@ -394,7 +405,7 @@ impl StagingBuffer {
                     &host_buffer_memory, 
                     &device_buffer_memory,
                     mapped);
-                *state += size;
+                *state += size.allocation_size;
                 Some(region)
             })
             .collect::<Vec<_>>();
@@ -486,8 +497,15 @@ impl Drop for StagingBuffer {
     }
 }
 
+#[derive(Copy, Clone)]
+pub struct StagingBufferRegionSize {
+    allocation_size: VkDeviceSize,
+    region_size: VkDeviceSize,
+}
+
 pub struct StagingBufferRegion {
-    copy_region: VkBufferCopy,
+    offset: VkDeviceSize,
+    size: StagingBufferRegionSize,
     command_pool: Arc<CommandPool>,
     host_buffer_memory: Arc<BufferMemory>,
     device_buffer_memory: Arc<BufferMemory>,
@@ -502,13 +520,13 @@ impl StagingBufferRegion {
     // depends on staging buffer as long as its host buffer is mapped
     // so that new() returns StagingBufferRegion instead of Arc<StagingBufferRegion>
     pub fn new(
-        offset: VkDeviceSize, 
-        size: VkDeviceSize,
+        offset: VkDeviceSize,
+        size: StagingBufferRegionSize,
         command_pool: &Arc<CommandPool>,
         host_buffer_memory: &Arc<BufferMemory>,
         device_buffer_memory: &Arc<BufferMemory>,
         mapped: *mut c_void) -> StagingBufferRegion {
-        let copy_region = VkBufferCopy::new(offset, size);
+        let copy_region = VkBufferCopy::new(offset, size.allocation_size);
         let device = command_pool.device();
         unsafe {
             let mut host_to_device_command = MaybeUninit::<VkCommandBuffer>::zeroed();
@@ -574,7 +592,7 @@ impl StagingBufferRegion {
                         VkAccessFlagBits::VK_ACCESS_HOST_READ_BIT as VkFlags,
                         host_buffer_memory.buffer(),
                         offset,
-                        size,
+                        size.allocation_size,
                     );
                     vkCmdPipelineBarrier(
                         device_to_host_command,
@@ -589,7 +607,8 @@ impl StagingBufferRegion {
                 vkEndCommandBuffer(device_to_host_command);
             }
             let region = StagingBufferRegion {
-                copy_region: copy_region,
+                offset: offset,
+                size: size,
                 command_pool: Arc::clone(command_pool),
                 host_buffer_memory: Arc::clone(host_buffer_memory),
                 device_buffer_memory: Arc::clone(device_buffer_memory),
@@ -640,7 +659,7 @@ impl StagingBufferRegion {
     fn invalidate_mapped_memory_range(&self) {
         let device = self.host_buffer_memory.device();
         let memory = self.host_buffer_memory.memory();
-        let mapped_range = VkMappedMemoryRange::new(memory, self.offset(), self.size());
+        let mapped_range = VkMappedMemoryRange::new(memory, self.offset(), self.allocation_size());
         unsafe {
             vkInvalidateMappedMemoryRanges(device.handle(), 1, &mapped_range)
                 .into_result()
@@ -651,7 +670,7 @@ impl StagingBufferRegion {
     fn flush_mapped_memory_range(&self) {
         let device = self.host_buffer_memory.device();
         let memory = self.host_buffer_memory.memory();
-        let mapped_range = VkMappedMemoryRange::new(memory, self.offset(), self.size());
+        let mapped_range = VkMappedMemoryRange::new(memory, self.offset(), self.allocation_size());
         unsafe {
             vkFlushMappedMemoryRanges(device.handle(), 1, &mapped_range)
                 .into_result()
@@ -661,23 +680,22 @@ impl StagingBufferRegion {
 
     #[inline]
     pub fn offset(&self) -> VkDeviceSize {
-        self.copy_region.srcOffset
+        self.offset
     }
 
     #[inline]
-    pub fn size(&self) -> VkDeviceSize {
-        self.copy_region.size
+    pub fn allocation_size(&self) -> VkDeviceSize {
+        self.size.allocation_size
     }
 
-    #[inline]
-    pub fn copy_region(&self) -> VkBufferCopy {
-        self.copy_region
+    pub fn region_size(&self) -> VkDeviceSize {
+        self.size.region_size
     }
 
     #[inline]
     unsafe fn as_slice<'a, ValueType>(&'a self) -> &'a [ValueType] {
         let value_size = std::mem::size_of::<ValueType>();
-        let length = self.size() as usize / value_size;
+        let length = self.region_size() as usize / value_size;
         std::slice::from_raw_parts(self.region_ptr as *const ValueType, length)
     }
 
@@ -689,7 +707,7 @@ impl StagingBufferRegion {
     #[inline]
     unsafe fn as_mut_slice<'a, ValueType>(&'a self) -> &'a mut [ValueType] {
         let value_size = std::mem::size_of::<ValueType>();
-        let length = self.size() as usize / value_size;
+        let length = self.region_size() as usize / value_size;
         std::slice::from_raw_parts_mut(self.region_ptr as *mut ValueType, length)
     }
 

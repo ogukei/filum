@@ -132,66 +132,6 @@ impl Drop for BufferMemory {
     }
 }
 
-struct BufferMemoryMappedRange {
-    offset: VkDeviceSize, 
-    size: VkDeviceSize,
-    mapped: *mut c_void,
-    buffer_memory: Arc<BufferMemory>,
-}
-
-impl BufferMemoryMappedRange {
-    fn new(buffer_memory: &Arc<BufferMemory>, offset: VkDeviceSize, size: VkDeviceSize) -> Arc<Self> {
-        let device = buffer_memory.device();
-        // Make device writes visible to the host
-        let mut mapped = MaybeUninit::<*mut c_void>::zeroed();
-        unsafe {
-            vkMapMemory(device.handle(), buffer_memory.memory(), offset, size, 0, mapped.as_mut_ptr())
-                .into_result()
-                .unwrap();
-            let mapped = mapped.assume_init();
-            let range = BufferMemoryMappedRange {
-                offset,
-                size,
-                mapped,
-                buffer_memory: Arc::clone(buffer_memory),
-            };
-            Arc::new(range)
-        }
-    } 
-
-    fn invalidate(&self) {
-        let device = self.buffer_memory.device();
-        let memory = self.buffer_memory.memory();
-        let mapped_range = VkMappedMemoryRange::new(memory, self.offset, self.size);
-        unsafe {
-            vkInvalidateMappedMemoryRanges(device.handle(), 1, &mapped_range)
-                .into_result()
-                .unwrap();
-        }
-    }
-
-    fn flush(&self) {
-        let device = self.buffer_memory.device();
-        let memory = self.buffer_memory.memory();
-        let mapped_range = VkMappedMemoryRange::new(memory, self.offset, self.size);
-        unsafe {
-            vkFlushMappedMemoryRanges(device.handle(), 1, &mapped_range)
-                .into_result()
-                .unwrap();
-        }
-    }
-}
-
-impl Drop for BufferMemoryMappedRange {
-    fn drop(&mut self) {
-        unsafe {
-            let device = self.buffer_memory.device();
-            let memory = self.buffer_memory.memory();
-            vkUnmapMemory(device.handle(), memory);
-        }
-    }
-}
-
 pub struct CommandPool {
     handle: VkCommandPool,
     device: Arc<Device>,
@@ -307,7 +247,7 @@ pub struct ShaderModule {
 }
 
 impl ShaderModule {
-    pub fn new<S: Into<String>>(device: &Arc<Device>, filename: S) -> std::io::Result<Arc<Self>> {
+    pub fn new(device: &Arc<Device>, filename: impl Into<String>) -> std::io::Result<Arc<Self>> {
         let mut file = std::fs::File::open(filename.into())?;
         let mut buffer = Vec::<u8>::new();
         let bytes = file.read_to_end(&mut buffer)?;
@@ -315,7 +255,7 @@ impl ShaderModule {
         assert_eq!(bytes % 4, 0);
         unsafe {
             let mut handle = MaybeUninit::<VkShaderModule>::zeroed();
-            let create_info = VkShaderModuleCreateInfo::new(bytes, std::mem::transmute(buffer.as_mut_ptr()));
+            let create_info = VkShaderModuleCreateInfo::new(bytes, buffer.as_mut_ptr() as *const u32);
             vkCreateShaderModule(device.handle, &create_info, ptr::null(), handle.as_mut_ptr())
                 .into_result()
                 .unwrap();
