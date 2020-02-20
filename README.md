@@ -31,7 +31,18 @@ pipeline.dispatch(num_elements);
 binding.fetch_array_copying(&mut v);
  ```
  
- Connected Component Labeling. This is an implementation of the algorithm below.
+ ## Features
+- High-level interface
+- Type-safe in-out buffer access
+- Vulkan compute kernel
+    - Multiple layout binding support
+    - Multiple shader stages support
+    - Push constants
+    - Specialization constants
+ 
+ ## Another Example
+ 
+ Connected Component Labeling. This is actually an implementation of the algorithm below.
  > A Parallel Approach to Object Identification in Large-scale Images
  >
  > https://www.academia.edu/29842500/
@@ -97,3 +108,10 @@ column.dispatch(dim.0);
 relabel.dispatch(len);
 binding.fetch_array_copying(&mut table);
 ```
+
+## Performance
+Connected component labeling 8K Image
+
+GPU computation took `~210ms` including memory transfer operations.
+
+![image](https://gist.githubusercontent.com/ogukei/8fbe74217d57a63d46be9e4bb4cae021/raw/0c972f2d8bc70168530828ecbda24ef7173888ce/ccl.png)
