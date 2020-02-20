@@ -129,8 +129,15 @@ Connected component labeling 8K Image
 
 GPU computation took `~210ms` including memory transfer operations. 
 
-* OS: Ubuntu 18.04
+* OS: Ubuntu 18.04 LTS
 * CPU: Intel(R) Core(TM) i7-3930K CPU @ 3.20GHz
 * GPU: NVIDIA GeForce RTX 2070
 
 ![image](https://gist.githubusercontent.com/ogukei/8fbe74217d57a63d46be9e4bb4cae021/raw/0c972f2d8bc70168530828ecbda24ef7173888ce/ccl.png)
+
+## Runtime Environment
+- Requires Vulkan 1.1 Runtime
+- Vulkan 1.1 supported Graphics Driver
+
+To compile compute shader GLSL into SPIR-V, we recommend [Vulkan SDK](https://www.lunarg.com/vulkan-sdk/) to compile with.
+
