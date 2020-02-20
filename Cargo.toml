@@ -3,6 +3,10 @@ name = "filum"
 version = "0.1.0"
 authors = ["Keitaro Oguri <ogukei256@gmail.com>"]
 edition = "2018"
+repository = "https://github.com/ogukei/filum"
+keywords = ["gpgpu", "vulkan", "pallarel"]
+license-file = "LICENSE"
+description = "Easy GPGPU powered by Vulkan"
 
 [dependencies]
 libc = "0.2.66"
