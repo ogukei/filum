@@ -7,7 +7,6 @@ use super::error::Result;
 use std::sync::Arc;
 use std::marker::PhantomData;
 
-
 #[macro_export]
 macro_rules! bindings {
     ($v0:expr,) => {
@@ -205,7 +204,7 @@ pub struct BufferView<LayoutType> {
 }
 
 impl<LayoutType> BufferView<LayoutType> {
-    // returns underlying buffer, type erasure.
+    // returns underlying buffer
     #[inline]
     pub fn buffer(&self) -> &Arc<Buffer> {
         &self.buffer

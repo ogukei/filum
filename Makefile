@@ -1,11 +1,11 @@
 
 
-all: data/merge.comp.spv data/column.comp.spv data/relabel.comp.spv data/headless.comp.spv
+all: data/merge.comp.spv data/column.comp.spv data/relabel.comp.spv data/fibonacci.comp.spv
 clean:
 	rm -f data/merge.comp.spv
 	rm -f data/column.comp.spv
 	rm -f data/relabel.comp.spv
-	rm -f data/headless.comp.spv
+	rm -f data/fibonacci.comp.spv
 
 data/column.comp.spv: data/column.comp
 	glslc -O \
@@ -28,9 +28,9 @@ data/relabel.comp.spv: data/relabel.comp
 	--target-spv=spv1.3 \
 	-o data/relabel.comp.spv
 
-data/headless.comp.spv: data/headless.comp
+data/fibonacci.comp.spv: data/fibonacci.comp
 	glslc -O \
-	-c \data/headless.comp \
+	-c \data/fibonacci.comp \
 	--target-env=vulkan1.1 \
 	--target-spv=spv1.3 \
-	-o data/headless.comp.spv
+	-o data/fibonacci.comp.spv

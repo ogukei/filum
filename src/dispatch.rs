@@ -9,10 +9,8 @@ use std::ptr;
 use std::mem;
 use std::ffi::{CStr, CString};
 use std::mem::MaybeUninit;
-use libc::{c_float, c_void};
+use libc::{c_void};
 use std::sync::Arc;
-use std::io::Read;
-use std::marker::PhantomData;
 
 pub struct CommandDispatch {
     compute_pipeline: Arc<ComputePipeline>,

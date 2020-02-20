@@ -1,11 +1,9 @@
 
 use super::instance::{Instance};
-use super::device::{Device, DeviceBuilder, CommandPool, ShaderModule};
-use super::dispatch::{StagingBuffer, ComputePipeline, CommandDispatch};
+use super::device::{Device, DeviceBuilder, CommandPool};
 
 use super::error::Result;
 use std::sync::Arc;
-use std::marker::PhantomData;
 
 pub struct Context {
     instance: Arc<Instance>,

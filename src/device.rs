@@ -6,7 +6,6 @@ use super::instance::{Instance, QueueFamily, PhysicalDevice, PhysicalDevicesBuil
 
 use std::ptr;
 use std::mem;
-use std::ffi::{CStr, CString};
 use std::mem::MaybeUninit;
 use libc::{c_float, c_void};
 use std::sync::Arc;
