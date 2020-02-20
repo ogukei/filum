@@ -1,7 +1,7 @@
 
 #[macro_use]
-extern crate stala;
-use stala::{Context, BufferViewBuilder, PipelineBuilder, DispatchBuilder};
+extern crate filum;
+use filum::{Context, BufferViewBuilder, PipelineBuilder, DispatchBuilder};
 
 fn main() {
     fibonacci(32);
@@ -33,13 +33,16 @@ fn fibonacci(num_elements: usize) {
     println!("{:?}", v);
 }
 
+// an implementation of
+// A Parallel Approach to Object Identification in Large-scale Images
+// @see https://www.academia.edu/29842500/
 fn connected_component_labeling() {
-    fn dump(v: &[i32]) {
+    fn dump(v: &[i32], dim_x: usize) {
         let lines: Vec<String> = v.iter()
             .map(|v| format!("{:3}, ", v))
             .collect();
         let new_line = "\n".to_string();
-        let lines: String = lines.chunks(8)
+        let lines: String = lines.chunks(dim_x)
             .flat_map(|chunk| chunk.iter().chain(std::iter::once(&new_line)))
             .cloned()
             .collect();
@@ -107,5 +110,5 @@ fn connected_component_labeling() {
     relabel.dispatch(len);
     binding.fetch_array_copying(&mut table);
     // output
-    dump(&table);
+    dump(&table, dim.0);
 }
