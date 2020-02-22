@@ -241,7 +241,7 @@ impl ComputePipeline {
                         VkDescriptorBufferInfo::new(
                             staging_buffer.device_buffer_memory().buffer(), 
                             region.offset(), 
-                            region.allocation_size())
+                            region.region_size())
                     })
                     .collect::<Vec<VkDescriptorBufferInfo>>();
                 let write_sets = infos.iter()
