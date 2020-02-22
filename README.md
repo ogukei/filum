@@ -59,9 +59,16 @@ fn main() {
 
 ## Quickstart
 
-Make sure `vulkaninfo` command runs on your system and Vulkan version matches `1.1.x`.
+Make sure `vulkaninfo` command runs on your system and Vulkan version matches `1.1.x` or above.
 
-Update your Cargo.toml
+Running an example project
+```
+git clone https://github.com/ogukei/filum-example
+cd filum-example/fibonacci
+cargo run --release
+```
+
+Update your Cargo.toml if you want starting from scratch.
 ```
 [dependencies]
 filum = "*"
@@ -129,7 +136,6 @@ fn main() {
         let mut step_index = 0;
         let mut n = dim.0 >> 1;
         while n != 0 {
-            println!("n {}, si {}", n, step_index);
             let dispatch = DispatchBuilder::new(&merge)
                 .workgroup_count(n, 1, 1)
                 .push_constants(constants!(step_index as u32))
@@ -173,10 +179,63 @@ Result (resized) |
 :-:|
 ![image](https://gist.githubusercontent.com/ogukei/8fbe74217d57a63d46be9e4bb4cae021/raw/0c972f2d8bc70168530828ecbda24ef7173888ce/ccl.png) |
 
+_The Vulkan logo is a trademark of the Khronos Group Inc._
+
 ## Runtime Environment
 - Requires Vulkan 1.1 Runtime
-- Vulkan 1.1 supported Graphics Driver
+- Vulkan 1.1 capable graphics drivers
 
 To compile compute shader GLSL into SPIR-V, we recommend [Vulkan SDK](https://www.lunarg.com/vulkan-sdk/) to compile with.
 
 ## Getting Started
+
+Install Vulkan 1.1 compatible OS. Ubuntu 18.04 LTS is highly recommended since its graphics driver installation is pretty easy.
+
+For Ubuntu 18.04 LTS users, proceed the following steps. The other OS users, see the information at https://www.lunarg.com/vulkan-sdk/ and proceed to the step 3 once your Vulkan setup is done.
+
+1. Run the following command if you don't have Vulkan 1.1 compatible graphics driver yet
+
+Please ensure you have Vulkan 1.1 capable graphics cards checking the following pages.
+
+For NVIDIA graphics cards users \
+https://developer.nvidia.com/vulkan-driver
+
+For AMD graphics cards users \
+https://gpuopen.com/gaming-product/vulkan/
+
+```
+ubuntu-drivers list
+ubuntu-drivers install <recommended-version>
+```
+
+Please restart your system to complete the driver installation.
+
+2. Run the following command if you don't have Vulkan SDK installed
+```
+sudo apt update
+sudo apt install vulkan-sdk
+```
+
+3. Run the following command to check your setup is done properly
+```
+vulkaninfo
+```
+
+4. Clone our example project
+```
+git clone https://github.com/ogukei/filum-example
+```
+
+5. Run an example project
+```
+cd filum-example
+cd fibonacci
+cargo run --release
+```
+
+6. Compile GLSL compute shaders using `glslc`
+```
+cd filum-example
+cd fibonacci
+make -j
+```
