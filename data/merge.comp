@@ -1,47 +1,48 @@
 #version 450
 
+#define INDEX(_x, _y) ((_y) * WIDTH + (_x))
+#define IS_CONNECTED(_i0, _i1) (values[_i0] >= 0 && values[_i1] >= 0)
+#define LABEL(_idx) (values[_idx])
+
 layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
 layout(constant_id = 0) const uint WIDTH = 8;
 layout(constant_id = 1) const uint HEIGHT = 8;
 layout(push_constant) uniform PushConstant {
-	uint step_index;
+    uint step_index;
 };
 layout(binding = 0) buffer Binding { 
-	int values[];
+    int values[];
 };
 
-#define INDEX(_x, _y) ((_y) * WIDTH + (_x))
-#define IS_CONNECTED(_idx) (values[_idx] >= 0)
-#define LABEL(_idx) (values[_idx])
-
-int find_root(uint index) {
-	int v = LABEL(index);
-	if (v < 0) {
-		return v;
-	}
-	v = int(index);
-	while (LABEL(v) != v) {
-		v = LABEL(v);
-	}
-	return v;
+int findRoot(uint index) {
+    int v = LABEL(index);
+    if (v < 0) {
+        return v;
+    }
+    int w = int(index);
+    while (v != w) {
+        w = v;
+        v = LABEL(v);
+    }
+    return v;
 }
 
 void merge(uint x0) {
-	uint x1 = x0 + 1;
-	for (uint y = 0; y < HEIGHT; ++y) {
-		uint i0 = INDEX(x0, y);
-		uint i1 = INDEX(x1, y);
-		if (IS_CONNECTED(i0) && IS_CONNECTED(i1)) {
-			int v0 = find_root(i0);
-			int v1 = find_root(i1);
-			LABEL(max(v0, v1)) = LABEL(min(v0, v1));
-		}
-	}
+    uint x1 = x0 + 1;
+    for (uint y = 0; y < HEIGHT; ++y) {
+        uint i0 = INDEX(x0, y);
+        uint i1 = INDEX(x1, y);
+        if (IS_CONNECTED(i0, i1)) {
+            int v0 = findRoot(i0);
+            int v1 = findRoot(i1);
+            LABEL(max(v0, v1)) = LABEL(min(v0, v1));
+        }
+    }
 }
 
 void main() {
-	uint id = gl_GlobalInvocationID.x;
-	uint steps = WIDTH / (WIDTH >> (step_index + 1));
+    uint id = gl_GlobalInvocationID.x;
+    uint steps = WIDTH / (WIDTH >> (step_index + 1));
     uint x0 = (id * steps) + (1 << step_index) - 1;
-	merge(x0);
+    merge(x0);
 }

@@ -5,20 +5,20 @@ layout(binding = 0) buffer Binding {
 };
 
 uint fibonacci(uint n) {
-	if (n <= 1) {
-		return n;
-	}
-	uint curr = 1;
-	uint prev = 1;
-	for (uint i = 2; i < n; ++i) {
-		uint temp = curr;
-		curr += prev;
-		prev = temp;
-	}
-	return curr;
+    if (n <= 1) {
+        return n;
+    }
+    uint curr = 1;
+    uint prev = 1;
+    for (uint i = 2; i < n; ++i) {
+        uint temp = curr;
+        curr += prev;
+        prev = temp;
+    }
+    return curr;
 }
 
 void main() {
-	uint index = gl_GlobalInvocationID.x;
-	values[index] = fibonacci(values[index]);
+    uint index = gl_GlobalInvocationID.x;
+    values[index] = fibonacci(values[index]);
 }
