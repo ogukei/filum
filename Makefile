@@ -1,36 +1,19 @@
 
+# compiles all the GLSL files in ./data
 
-all: data/merge.comp.spv data/column.comp.spv data/relabel.comp.spv data/fibonacci.comp.spv
+SOURCE_DIR=data
+BUILD_DIR=data
+
+SOURCES=$(shell find $(SOURCE_DIR) -name '*.comp')
+OBJECTS=$(patsubst $(SOURCE_DIR)/%.comp, $(BUILD_DIR)/%.comp.spv, $(SOURCES))
+
+all: $(OBJECTS)
 clean:
-	rm -f data/merge.comp.spv
-	rm -f data/column.comp.spv
-	rm -f data/relabel.comp.spv
-	rm -f data/fibonacci.comp.spv
+	rm -f $(BUILD_DIR)/*.spv
 
-data/column.comp.spv: data/column.comp
+$(BUILD_DIR)/%.comp.spv: $(SOURCE_DIR)/%.comp
 	glslc -O \
-	-c \data/column.comp \
+	-c $< \
 	--target-env=vulkan1.1 \
 	--target-spv=spv1.3 \
-	-o data/column.comp.spv
-
-data/merge.comp.spv: data/merge.comp
-	glslc -O \
-	-c \data/merge.comp \
-	--target-env=vulkan1.1 \
-	--target-spv=spv1.3 \
-	-o data/merge.comp.spv
-
-data/relabel.comp.spv: data/relabel.comp
-	glslc -O \
-	-c \data/relabel.comp \
-	--target-env=vulkan1.1 \
-	--target-spv=spv1.3 \
-	-o data/relabel.comp.spv
-
-data/fibonacci.comp.spv: data/fibonacci.comp
-	glslc -O \
-	-c \data/fibonacci.comp \
-	--target-env=vulkan1.1 \
-	--target-spv=spv1.3 \
-	-o data/fibonacci.comp.spv
+	-o $@
