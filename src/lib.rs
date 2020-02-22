@@ -16,7 +16,8 @@ mod view;
 mod pipeline;
 
 pub use context::{Context};
-pub use view::{BufferLayout, BindingVariant, BindingArray, BindingValue, BufferViewBuilder};
-pub use pipeline::{PipelineBuilder, DispatchBuilder};
-pub use dispatch::{ConstantEntry};
-
+pub use buffer::{Buffer};
+pub use view::{BufferLayout, BindingVariant, BindingArray, BindingValue};
+pub use view::{BufferBindingView, BufferView, BufferViewBuilder};
+pub use pipeline::{Pipeline, PipelineBuilder, DispatchBuilder};
+pub use dispatch::{ConstantEntry, CommandDispatch};
