@@ -4,7 +4,7 @@ use super::context::{Context};
 use super::buffer::{Buffer};
 
 use super::instance::{Instance};
-use super::device::{Device, DeviceBuilder, CommandPool, ShaderModule};
+use super::device::{Device, DeviceBuilder, CommandPool, ShaderModule, ShaderModuleSource};
 use super::dispatch::{StagingBuffer, ComputePipeline, CommandDispatch, WorkgroupCount, ConstantEntry};
 
 use super::error::Result;
@@ -50,9 +50,17 @@ impl<'a> PipelineBuilder<'a, (), ()> {
 }
 
 impl<'a, SpecializationType> PipelineBuilder<'a, (), SpecializationType> {
-    pub fn shader(self, filename: impl Into<String>) -> PipelineBuilder<'a, String, SpecializationType> {
+    pub fn shader(self, filename: impl Into<String>) -> PipelineBuilder<'a, ShaderModuleSource, SpecializationType> {
         PipelineBuilder {
-            shader: filename.into(),
+            shader: ShaderModuleSource::from_file(filename),
+            specialization: self.specialization,
+            buffer: self.buffer,
+        }
+    }
+
+    pub fn shader_bytes(self, bytes: Vec<u8>) -> PipelineBuilder<'a, ShaderModuleSource, SpecializationType> {
+        PipelineBuilder {
+            shader: ShaderModuleSource::from_bytes(bytes),
             specialization: self.specialization,
             buffer: self.buffer,
         }
@@ -70,13 +78,13 @@ impl<'a, ShaderType> PipelineBuilder<'a, ShaderType, ()> {
     }
 }
 
-impl<'a> PipelineBuilder<'a, String, ()> {
+impl<'a> PipelineBuilder<'a, ShaderModuleSource, ()> {
     pub fn build(self) -> Result<Arc<Pipeline>> {
         Pipeline::new(self.buffer, self.shader, vec![])
     }
 }
 
-impl<'a> PipelineBuilder<'a, String, Vec<ConstantEntry>> {
+impl<'a> PipelineBuilder<'a, ShaderModuleSource, Vec<ConstantEntry>> {
     pub fn build(self) -> Result<Arc<Pipeline>> {
         Pipeline::new(self.buffer, self.shader, self.specialization)
     }
@@ -89,11 +97,11 @@ pub struct Pipeline {
 }
 
 impl Pipeline {
-    fn new(buffer: &Arc<Buffer>, shader: String, spec_constants: Vec<ConstantEntry>) -> Result<Arc<Self>> {
+    fn new(buffer: &Arc<Buffer>, shader: ShaderModuleSource, spec_constants: Vec<ConstantEntry>) -> Result<Arc<Self>> {
         let context = buffer.context();
         let device = context.device();
         let staging_buffer = buffer.staging_buffer();
-        let shader_module = ShaderModule::new(device, shader).unwrap();
+        let shader_module = ShaderModule::new(device, shader)?;
         let compute_pipeline = ComputePipeline::new(staging_buffer, &shader_module, spec_constants);
         let pipeline = Pipeline {
             buffer: Arc::clone(buffer),

@@ -10,7 +10,9 @@ pub enum ErrorCode {
     VkResult(VkResult),
     FFI(std::ffi::NulError),
     SuitablePhysicalDeviceNotFound,
-    SuitableBufferMemoryTypeNotFound
+    SuitableBufferMemoryTypeNotFound,
+    ShaderLoadIO(std::io::Error),
+    ShaderLoadUnaligned,
 }
 
 #[derive(Debug)]
