@@ -240,24 +240,59 @@ impl<'a> DeviceBuilder<'a> {
     }
 }
 
+pub enum ShaderModuleSource {
+    FilePath(String),
+    Bytes(Vec<u8>),
+}
+
+impl ShaderModuleSource {
+    pub fn from_file(filename: impl Into<String>) -> Self {
+        ShaderModuleSource::FilePath(filename.into())        
+    }
+
+    pub fn from_bytes(bytes: Vec<u8>) -> Self {
+        ShaderModuleSource::Bytes(bytes)        
+    }
+
+    fn load(self) -> Result<(Vec<u8>, usize)> {
+        match self {
+            ShaderModuleSource::FilePath(filename) => {
+                let mut file = std::fs::File::open(filename)
+                    .map_err(|v| ErrorCode::ShaderLoadIO(v))?;
+                let mut buffer = Vec::<u8>::new();
+                let bytes = file.read_to_end(&mut buffer)
+                    .map_err(|v| ErrorCode::ShaderLoadIO(v))?;
+                if bytes > 0 && (bytes % 4) == 0 {
+                    Ok((buffer, bytes))
+                } else {
+                    Err(ErrorCode::ShaderLoadUnaligned.into())
+                }
+            },
+            ShaderModuleSource::Bytes(vector) => {
+                let bytes = vector.len();
+                if bytes > 0 && (bytes % 4) == 0 {
+                    Ok((vector, bytes))
+                } else {
+                    Err(ErrorCode::ShaderLoadUnaligned.into())
+                }
+            },
+        }
+    }
+}
+
 pub struct ShaderModule {
     handle: VkShaderModule,
     device: Arc<Device>,
 }
 
 impl ShaderModule {
-    pub fn new(device: &Arc<Device>, filename: impl Into<String>) -> std::io::Result<Arc<Self>> {
-        let mut file = std::fs::File::open(filename.into())?;
-        let mut buffer = Vec::<u8>::new();
-        let bytes = file.read_to_end(&mut buffer)?;
-        assert!(bytes > 0);
-        assert_eq!(bytes % 4, 0);
+    pub fn new(device: &Arc<Device>, source: ShaderModuleSource) -> Result<Arc<Self>> {
         unsafe {
+            let (buffer, num_bytes) = source.load()?;
             let mut handle = MaybeUninit::<VkShaderModule>::zeroed();
-            let create_info = VkShaderModuleCreateInfo::new(bytes, buffer.as_mut_ptr() as *const u32);
+            let create_info = VkShaderModuleCreateInfo::new(num_bytes, buffer.as_ptr() as *const u32);
             vkCreateShaderModule(device.handle, &create_info, ptr::null(), handle.as_mut_ptr())
-                .into_result()
-                .unwrap();
+                .into_result()?;
             let handle = handle.assume_init();
             let shader_module = ShaderModule {
                 handle: handle,
